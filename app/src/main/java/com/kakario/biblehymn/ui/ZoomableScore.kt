@@ -129,12 +129,14 @@ fun ZoomableScore(pages: List<String>, fitScreen: Boolean, modifier: Modifier = 
                 },
         ) {
             val loaded = bitmaps.filterNotNull()
+            val boxWidth = maxWidth
+            val boxHeight = maxHeight
             if (loaded.size < pages.size) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
                 // 화면 너비에 맞췄을 때 전체 높이 → 화면보다 크면(설정 켰을 때) 한 화면에 들어오게 축소
-                val totalHeight = loaded.sumOf { (maxWidth.value * it.height / it.width).toDouble() }.toFloat()
-                val shrink = if (fitScreen && totalHeight > maxHeight.value) maxHeight.value / totalHeight else 1f
+                val totalHeight = loaded.sumOf { (boxWidth.value * it.height / it.width).toDouble() }.toFloat()
+                val shrink = if (fitScreen && totalHeight > boxHeight.value) boxHeight.value / totalHeight else 1f
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -148,7 +150,7 @@ fun ZoomableScore(pages: List<String>, fitScreen: Boolean, modifier: Modifier = 
                             contentScale = ContentScale.FillWidth,
                             filterQuality = FilterQuality.High,
                             modifier = Modifier
-                                .width(maxWidth * shrink)
+                                .width(boxWidth * shrink)
                                 .aspectRatio(b.width.toFloat() / b.height.toFloat()),
                         )
                     }
