@@ -33,10 +33,6 @@ android {
         }
     }
 
-    // MIDI 반주 파일을 압축하지 않고 넣어야 바로 재생할 수 있다
-    androidResources {
-        noCompress += listOf("mid", "midi")
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

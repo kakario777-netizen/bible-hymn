@@ -22,11 +22,9 @@ enum class SongBook(val dir: String, val title: String, val count: Int) {
  * 찬송 데이터 (assets/<dir>)
  * - titles.txt : 번호|제목
  * - score/001.gif(.jpg) … 두 쪽짜리는 046-1.gif, 046-2.gif
- * - midi/001.mid … (반주 — 아직 비어 있음, 넣으면 바로 재생됨)
  */
 object Hymns {
     private val cache = HashMap<SongBook, List<Hymn>>()
-    private val midiCache = HashMap<SongBook, Map<Int, String>>()
 
     fun all(context: Context, book: SongBook): List<Hymn> {
         synchronized(cache) { cache[book]?.let { return it } }
@@ -57,22 +55,6 @@ object Hymns {
         }
         synchronized(cache) { cache[book] = list }
         return list
-    }
-
-    /** 반주 MIDI 파일 경로 (없으면 null → '준비중') */
-    fun midiPath(context: Context, book: SongBook, number: Int): String? {
-        val map = synchronized(midiCache) { midiCache[book] } ?: run {
-            val names = try {
-                context.assets.list("${book.dir}/midi") ?: emptyArray()
-            } catch (e: Exception) {
-                emptyArray()
-            }
-            names.filter { it.endsWith(".mid", true) || it.endsWith(".midi", true) }
-                .mapNotNull { name -> name.substringBefore('.').toIntOrNull()?.let { it to "${book.dir}/midi/$name" } }
-                .toMap()
-                .also { synchronized(midiCache) { midiCache[book] = it } }
-        }
-        return map[number]
     }
 }
 

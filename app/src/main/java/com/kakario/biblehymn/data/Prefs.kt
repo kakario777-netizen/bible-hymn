@@ -58,6 +58,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("fitScore", false)
         set(v) = sp.edit().putBoolean("fitScore", v).apply()
 
+    /** 배경색: 0 = 시스템 설정, 1 = 흰색, 2 = 검은색 */
+    var themeMode: Int
+        get() = sp.getInt("themeMode", 0)
+        set(v) = sp.edit().putInt("themeMode", v).apply()
+
     /** 첫 화면 제목 밑 부제목 (비어 있으면 표시 안 함) */
     var homeSubtitle: String
         get() = sp.getString("homeSubtitle", "") ?: ""

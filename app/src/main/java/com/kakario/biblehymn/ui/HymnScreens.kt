@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kakario.biblehymn.data.Hymn
 import com.kakario.biblehymn.data.Hymns
-import com.kakario.biblehymn.data.MidiPlayer
 import com.kakario.biblehymn.data.Prefs
 import com.kakario.biblehymn.data.SongBook
 import kotlinx.coroutines.Dispatchers
@@ -257,16 +256,12 @@ fun HymnViewerScreen(
         hymns?.size ?: book.count
     }
     val scope = rememberCoroutineScope()
-    val midi = remember { MidiPlayer(context.applicationContext) }
     val fitScore = remember { prefs.fitScore }
-    DisposableEffect(Unit) { onDispose { midi.stop() } }
 
     val current = hymns?.getOrNull(pager.currentPage)
 
     LaunchedEffect(pager.currentPage) {
         prefs.setLastSong(book, pager.currentPage + 1)
-        // 다른 곡으로 넘기면 반주는 멈춤
-        if (midi.playingNumber != null && midi.playingNumber != pager.currentPage + 1) midi.stop()
     }
 
     Scaffold(
@@ -289,26 +284,11 @@ fun HymnViewerScreen(
                         onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } },
                     ) { Text("◀ 이전") }
 
-                    val n = pager.currentPage + 1
-                    val hasMidi = remember(n) { Hymns.midiPath(context, book, n) != null }
-                    if (hasMidi) {
-                        val playing = midi.playingNumber == n
-                        Button(onClick = {
-                            if (playing) midi.stop()
-                            else if (!midi.play(book, n)) Toast.makeText(context, "반주를 재생할 수 없어요", Toast.LENGTH_SHORT).show()
-                        }) {
-                            if (!playing) Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                            Text(if (playing) "■ 반주 멈춤" else " 반주 듣기")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { Toast.makeText(context, "MIDI 반주는 준비중입니다", Toast.LENGTH_SHORT).show() },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                            Text(" 반주 (준비중)")
-                        }
-                    }
+                    Text(
+                        "${pager.currentPage + 1} / ${pager.pageCount}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
 
                     TextButton(
                         enabled = pager.currentPage < pager.pageCount - 1,

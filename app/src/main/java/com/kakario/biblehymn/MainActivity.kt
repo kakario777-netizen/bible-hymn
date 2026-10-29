@@ -1,6 +1,13 @@
 package com.kakario.biblehymn
 
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -40,10 +47,34 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val prefs = Prefs(applicationContext)
         setContent {
-            AppTheme {
+            var themeMode by remember { mutableIntStateOf(prefs.themeMode) }
+            val systemDark = isSystemInDarkTheme()
+            val dark = when (themeMode) {
+                1 -> false
+                2 -> true
+                else -> systemDark
+            }
+            // 상단 상태바·하단 버튼 아이콘 색도 배경에 맞춤
+            LaunchedEffect(dark) {
+                val style = if (dark) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            AppTheme(dark = dark) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    App()
+                    App(
+                        prefs = prefs,
+                        themeMode = themeMode,
+                        onThemeMode = {
+                            themeMode = it
+                            prefs.themeMode = it
+                        },
+                    )
                 }
             }
         }
@@ -51,9 +82,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App() {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context.applicationContext) }
+private fun App(prefs: Prefs, themeMode: Int, onThemeMode: (Int) -> Unit) {
     val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
 
     fun push(s: Screen) {
@@ -73,6 +102,8 @@ private fun App() {
     when (val screen = stack.last()) {
         Screen.Home -> HomeScreen(
             prefs = prefs,
+            themeMode = themeMode,
+            onThemeMode = onThemeMode,
             onBible = { push(Screen.BibleBooks) },
             onContinueBible = { book, chapter, verse ->
                 push(Screen.BibleReader(book, chapter, verse))
