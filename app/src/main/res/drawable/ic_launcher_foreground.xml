@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 펼친 책 위에 십자가 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 왼쪽 면 -->
+    <path
+        android:fillColor="#FFF6EBD9"
+        android:pathData="M54,44 C46,39 38,38 30,39 L30,72 C38,71 46,72 54,77 Z" />
+    <!-- 오른쪽 면 -->
+    <path
+        android:fillColor="#FFFFF8EC"
+        android:pathData="M54,44 C62,39 70,38 78,39 L78,72 C70,71 62,72 54,77 Z" />
+    <!-- 십자가 -->
+    <path
+        android:fillColor="#FFE0B15A"
+        android:pathData="M52,22 L56,22 L56,28 L61,28 L61,32 L56,32 L56,41 L52,41 L52,32 L47,32 L47,28 L52,28 Z" />
+</vector>
