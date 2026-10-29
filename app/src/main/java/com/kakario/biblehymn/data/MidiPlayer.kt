@@ -17,9 +17,9 @@ class MidiPlayer(private val context: Context) {
     var playingNumber by mutableStateOf<Int?>(null)
         private set
 
-    fun play(number: Int): Boolean {
+    fun play(book: SongBook, number: Int): Boolean {
         stop()
-        val path = Hymns.midiPath(context, number) ?: return false
+        val path = Hymns.midiPath(context, book, number) ?: return false
         return try {
             val afd = context.assets.openFd(path)
             val mp = MediaPlayer()

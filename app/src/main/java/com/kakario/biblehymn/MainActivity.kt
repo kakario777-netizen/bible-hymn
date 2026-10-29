@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.kakario.biblehymn.data.Prefs
+import com.kakario.biblehymn.data.SongBook
 import com.kakario.biblehymn.ui.AppTheme
 import com.kakario.biblehymn.ui.BibleBooksScreen
 import com.kakario.biblehymn.ui.BibleChaptersScreen
@@ -31,8 +32,8 @@ sealed interface Screen {
     data class BibleChapters(val book: Int) : Screen
     data class BibleReader(val book: Int, val chapter: Int, val verse: Int = 1) : Screen
     data object Bookmarks : Screen
-    data object HymnList : Screen
-    data class HymnViewer(val number: Int) : Screen
+    data class HymnList(val book: SongBook) : Screen
+    data class HymnViewer(val book: SongBook, val number: Int) : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -77,7 +78,8 @@ private fun App() {
                 push(Screen.BibleReader(book, chapter, verse))
             },
             onBookmarks = { push(Screen.Bookmarks) },
-            onHymn = { push(Screen.HymnList) },
+            onHymn = { push(Screen.HymnList(SongBook.UNIFIED)) },
+            onMySoul = { push(Screen.HymnList(SongBook.MYSOUL)) },
         )
 
         Screen.BibleBooks -> BibleBooksScreen(
@@ -111,13 +113,15 @@ private fun App() {
             onOpen = { b, c, v -> push(Screen.BibleReader(b, c, v)) },
         )
 
-        Screen.HymnList -> HymnListScreen(
+        is Screen.HymnList -> HymnListScreen(
+            book = screen.book,
             prefs = prefs,
             onBack = ::pop,
-            onHymn = { push(Screen.HymnViewer(it)) },
+            onHymn = { push(Screen.HymnViewer(screen.book, it)) },
         )
 
         is Screen.HymnViewer -> HymnViewerScreen(
+            book = screen.book,
             number = screen.number,
             prefs = prefs,
             onBack = ::pop,

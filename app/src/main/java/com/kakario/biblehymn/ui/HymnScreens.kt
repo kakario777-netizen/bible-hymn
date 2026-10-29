@@ -64,27 +64,29 @@ import com.kakario.biblehymn.data.Hymn
 import com.kakario.biblehymn.data.Hymns
 import com.kakario.biblehymn.data.MidiPlayer
 import com.kakario.biblehymn.data.Prefs
+import com.kakario.biblehymn.data.SongBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-private fun rememberHymns(): List<Hymn>? {
+private fun rememberHymns(book: SongBook): List<Hymn>? {
     val context = LocalContext.current
-    val hymns by produceState<List<Hymn>?>(null) {
-        value = withContext(Dispatchers.IO) { Hymns.all(context) }
+    val hymns by produceState<List<Hymn>?>(null, book) {
+        value = withContext(Dispatchers.IO) { Hymns.all(context, book) }
     }
     return hymns
 }
 
-/** 통일찬송가 목록 + 번호/제목 검색 */
+/** 찬송 목록 + 번호/제목 검색 */
 @Composable
 fun HymnListScreen(
+    book: SongBook,
     prefs: Prefs,
     onBack: () -> Unit,
     onHymn: (Int) -> Unit,
 ) {
-    val hymns = rememberHymns()
+    val hymns = rememberHymns(book)
     var query by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -106,7 +108,7 @@ fun HymnListScreen(
 
     // 처음 들어올 때 마지막으로 본 곡 근처로 스크롤
     LaunchedEffect(hymns) {
-        val last = prefs.lastHymn
+        val last = prefs.lastSong(book)
         if (hymns != null && query.isEmpty() && last > 3) listState.scrollToItem(last - 3)
     }
 
@@ -114,7 +116,7 @@ fun HymnListScreen(
     var fitScore by remember { mutableStateOf(prefs.fitScore) }
 
     Scaffold(topBar = {
-        BackTopBar("통일찬송가", onBack, actions = {
+        BackTopBar(book.title, onBack, actions = {
             IconButton(onClick = { showSettings = true }) {
                 Icon(Icons.Filled.Settings, contentDescription = "설정")
             }
@@ -155,7 +157,7 @@ fun HymnListScreen(
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
                     items(filtered, key = { it.number }) { h ->
-                        HymnRow(h, highlighted = h.number == prefs.lastHymn) { onHymn(h.number) }
+                        HymnRow(h, highlighted = h.number == prefs.lastSong(book)) { onHymn(h.number) }
                         HorizontalDivider(
                             Modifier.padding(start = 76.dp),
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
@@ -225,6 +227,7 @@ private fun HymnRow(h: Hymn, highlighted: Boolean, onClick: () -> Unit) {
         Text(
             h.title,
             fontSize = 17.sp,
+            color = if (h.hasScore) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(start = 16.dp),
@@ -243,14 +246,15 @@ private fun HymnRow(h: Hymn, highlighted: Boolean, onClick: () -> Unit) {
 /** 악보 보기 — 좌우로 넘기면 앞/뒤 장 */
 @Composable
 fun HymnViewerScreen(
+    book: SongBook,
     number: Int,
     prefs: Prefs,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val hymns = rememberHymns()
-    val pager = rememberPagerState(initialPage = (number - 1).coerceIn(0, Hymns.COUNT - 1)) {
-        hymns?.size ?: Hymns.COUNT
+    val hymns = rememberHymns(book)
+    val pager = rememberPagerState(initialPage = (number - 1).coerceIn(0, book.count - 1)) {
+        hymns?.size ?: book.count
     }
     val scope = rememberCoroutineScope()
     val midi = remember { MidiPlayer(context.applicationContext) }
@@ -260,7 +264,7 @@ fun HymnViewerScreen(
     val current = hymns?.getOrNull(pager.currentPage)
 
     LaunchedEffect(pager.currentPage) {
-        prefs.lastHymn = pager.currentPage + 1
+        prefs.setLastSong(book, pager.currentPage + 1)
         // 다른 곡으로 넘기면 반주는 멈춤
         if (midi.playingNumber != null && midi.playingNumber != pager.currentPage + 1) midi.stop()
     }
@@ -286,12 +290,12 @@ fun HymnViewerScreen(
                     ) { Text("◀ 이전") }
 
                     val n = pager.currentPage + 1
-                    val hasMidi = remember(n) { Hymns.midiPath(context, n) != null }
+                    val hasMidi = remember(n) { Hymns.midiPath(context, book, n) != null }
                     if (hasMidi) {
                         val playing = midi.playingNumber == n
                         Button(onClick = {
                             if (playing) midi.stop()
-                            else if (!midi.play(n)) Toast.makeText(context, "반주를 재생할 수 없어요", Toast.LENGTH_SHORT).show()
+                            else if (!midi.play(book, n)) Toast.makeText(context, "반주를 재생할 수 없어요", Toast.LENGTH_SHORT).show()
                         }) {
                             if (!playing) Icon(Icons.Filled.PlayArrow, contentDescription = null)
                             Text(if (playing) "■ 반주 멈춤" else " 반주 듣기")
@@ -323,7 +327,17 @@ fun HymnViewerScreen(
                 beyondViewportPageCount = 1,
                 key = { hymns[it].number },
             ) { page ->
-                ZoomableScore(hymns[page].pages, fitScreen = fitScore)
+                val h = hymns[page]
+                if (h.hasScore) {
+                    ZoomableScore(h.pages, fitScreen = fitScore)
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "${h.number}장은 악보 파일이 없어요",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

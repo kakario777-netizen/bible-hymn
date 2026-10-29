@@ -44,6 +44,15 @@ class Prefs(context: Context) {
         get() = sp.getInt("lastHymn", 0)
         set(v) = sp.edit().putInt("lastHymn", v).apply()
 
+    /** 책별 마지막으로 본 곡 */
+    fun lastSong(book: SongBook): Int =
+        if (book == SongBook.UNIFIED) lastHymn else sp.getInt("lastSong_${book.name}", 0)
+
+    fun setLastSong(book: SongBook, number: Int) {
+        if (book == SongBook.UNIFIED) lastHymn = number
+        else sp.edit().putInt("lastSong_${book.name}", number).apply()
+    }
+
     /** 큰 악보를 한 화면에 맞춰 축소 */
     var fitScore: Boolean
         get() = sp.getBoolean("fitScore", false)

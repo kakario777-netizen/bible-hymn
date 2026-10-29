@@ -37,6 +37,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.kakario.biblehymn.R
 import com.kakario.biblehymn.data.Prefs
 
@@ -48,6 +52,7 @@ fun HomeScreen(
     onContinueBible: (book: Int, chapter: Int, verse: Int) -> Unit,
     onBookmarks: () -> Unit,
     onHymn: () -> Unit,
+    onMySoul: () -> Unit,
 ) {
     val context = LocalContext.current
     var subtitle by remember { mutableStateOf(prefs.homeSubtitle) }
@@ -114,16 +119,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            MenuCard(
-                title = "내 영의 노래",
-                subtitle = "(준비중)",
-                mark = "♡",
-                container = MaterialTheme.colorScheme.surfaceVariant,
-                onContainer = MaterialTheme.colorScheme.onSurfaceVariant,
-                onClick = {
-                    Toast.makeText(context, "내 영의 노래는 준비중입니다", Toast.LENGTH_SHORT).show()
-                },
-            )
+            MySoulCard(onClick = onMySoul)
         }
     }
 
@@ -202,4 +198,88 @@ private fun MenuCard(
             }
         }
     }
+}
+
+private val MySoulBlue = Color(0xFF0B3394)
+
+/** 내 영의 노래 카드: 파란 바탕, 제목 위 물결 마크, 오른쪽 피아노줄 그림 */
+@Composable
+private fun MySoulCard(onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MySoulBlue, contentColor = Color.White),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Swoosh(Modifier.width(150.dp).height(12.dp))
+                Text("내 영의 노래", fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    "417장 · 악보",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 6.dp),
+                    color = Color.White.copy(alpha = 0.75f),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            PianoStrings(Modifier.width(34.dp).height(72.dp))
+        }
+    }
+}
+
+/** 제목 위 흰 물결(초승달 모양) 마크 */
+@Composable
+private fun Swoosh(modifier: Modifier) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val p = Path().apply {
+            moveTo(0f, h * 0.95f)
+            cubicTo(w * 0.30f, h * 0.05f, w * 0.62f, h * 0.10f, w * 0.80f, h * 0.55f)
+            cubicTo(w * 0.88f, h * 0.70f, w * 0.95f, h * 0.35f, w, 0f)
+            cubicTo(w * 0.95f, h * 0.60f, w * 0.86f, h * 1.00f, w * 0.76f, h * 0.80f)
+            cubicTo(w * 0.60f, h * 0.45f, w * 0.30f, h * 0.45f, 0f, h * 0.95f)
+            close()
+        }
+        drawPath(p, Color.White)
+    }
+}
+
+/** 피아노줄(세로 가는 줄)과 작은 별 반짝임 */
+@Composable
+private fun PianoStrings(modifier: Modifier) {
+    Canvas(modifier) {
+        val lines = 12
+        val gap = size.width / (lines - 1)
+        val stroke = 0.8.dp.toPx()
+        for (i in 0 until lines) {
+            val x = i * gap
+            drawLine(Color.White.copy(alpha = 0.85f), Offset(x, 0f), Offset(x, size.height), strokeWidth = stroke)
+        }
+        // (줄 번호, 높이 비율) — 원본 표지처럼 아래쪽에 흩어진 별
+        val stars = listOf(8 to 0.45f, 2 to 0.58f, 2 to 0.72f, 5 to 0.80f, 8 to 0.86f, 7 to 0.92f, 4 to 0.97f)
+        stars.forEach { (line, y) -> sparkle(Offset(line * gap, size.height * y), 3.2.dp.toPx()) }
+    }
+}
+
+private fun DrawScope.sparkle(c: Offset, r: Float) {
+    val k = r * 0.28f
+    val p = Path().apply {
+        moveTo(c.x, c.y - r)
+        lineTo(c.x + k, c.y - k)
+        lineTo(c.x + r, c.y)
+        lineTo(c.x + k, c.y + k)
+        lineTo(c.x, c.y + r)
+        lineTo(c.x - k, c.y + k)
+        lineTo(c.x - r, c.y)
+        lineTo(c.x - k, c.y - k)
+        close()
+    }
+    drawPath(p, Color.White)
 }

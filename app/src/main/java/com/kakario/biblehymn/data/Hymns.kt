@@ -7,57 +7,70 @@ import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 
-/** 통일찬송가 한 곡. pages = 악보 이미지(assets 경로) — 두 쪽짜리 곡은 2개 */
-data class Hymn(val number: Int, val title: String, val pages: List<String>)
+/** 찬송 한 곡. pages = 악보 이미지(assets 경로) — 두 쪽짜리는 2개, 악보가 없는 곡은 비어 있음 */
+data class Hymn(val number: Int, val title: String, val pages: List<String>) {
+    val hasScore: Boolean get() = pages.isNotEmpty()
+}
+
+/** 찬송가 책 종류 (assets 폴더 이름, 화면 제목, 전체 곡 수) */
+enum class SongBook(val dir: String, val title: String, val count: Int) {
+    UNIFIED("hymn", "통일찬송가", 558),
+    MYSOUL("mysoul", "내 영의 노래", 417),
+}
 
 /**
- * 통일찬송가 558장 (assets/hymn)
+ * 찬송 데이터 (assets/<dir>)
  * - titles.txt : 번호|제목
- * - score/001.gif … (두 쪽짜리는 046-1.gif, 046-2.gif)
+ * - score/001.gif(.jpg) … 두 쪽짜리는 046-1.gif, 046-2.gif
  * - midi/001.mid … (반주 — 아직 비어 있음, 넣으면 바로 재생됨)
  */
 object Hymns {
-    const val COUNT = 558
+    private val cache = HashMap<SongBook, List<Hymn>>()
+    private val midiCache = HashMap<SongBook, Map<Int, String>>()
 
-    @Volatile
-    private var cache: List<Hymn>? = null
-
-    @Volatile
-    private var midiFiles: Map<Int, String>? = null
-
-    fun all(context: Context): List<Hymn> {
-        cache?.let { return it }
-        synchronized(this) {
-            cache?.let { return it }
-            val files = context.assets.list("hymn/score")?.toSet() ?: emptySet()
-            val list = context.assets.open("hymn/titles.txt").bufferedReader(Charsets.UTF_8).use { r ->
-                r.readLines()
-                    .filter { it.contains('|') }
-                    .map { line ->
-                        val parts = line.split('|', limit = 2)
-                        val num = parts[0].trim().toInt()
-                        val base = "%03d".format(num)
-                        val pages = if ("$base.gif" in files) {
-                            listOf("hymn/score/$base.gif")
-                        } else {
-                            (1..9).map { "$base-$it.gif" }.takeWhile { it in files }.map { "hymn/score/$it" }
-                        }
-                        Hymn(num, parts[1].trim(), pages)
-                    }
-            }
-            cache = list
-            return list
+    fun all(context: Context, book: SongBook): List<Hymn> {
+        synchronized(cache) { cache[book]?.let { return it } }
+        val files = context.assets.list("${book.dir}/score")?.toSet() ?: emptySet()
+        val titles = context.assets.open("${book.dir}/titles.txt").bufferedReader(Charsets.UTF_8).use { r ->
+            r.readLines()
+                .filter { it.contains('|') }
+                .mapNotNull { line ->
+                    val parts = line.split('|', limit = 2)
+                    parts[0].trim().toIntOrNull()?.let { it to parts[1].trim() }
+                }
+                .toMap()
         }
+        fun pagesOf(num: Int): List<String> {
+            val base = "%03d".format(num)
+            for (ext in listOf("gif", "jpg", "png", "webp")) {
+                if ("$base.$ext" in files) return listOf("${book.dir}/score/$base.$ext")
+            }
+            for (ext in listOf("gif", "jpg", "png", "webp")) {
+                val multi = (1..9).map { "$base-$it.$ext" }.takeWhile { it in files }
+                if (multi.isNotEmpty()) return multi.map { "${book.dir}/score/$it" }
+            }
+            return emptyList()
+        }
+        val list = (1..book.count).map { n ->
+            val pages = pagesOf(n)
+            Hymn(n, titles[n] ?: "(악보 없음)", pages)
+        }
+        synchronized(cache) { cache[book] = list }
+        return list
     }
 
     /** 반주 MIDI 파일 경로 (없으면 null → '준비중') */
-    fun midiPath(context: Context, number: Int): String? {
-        val map = midiFiles ?: run {
-            val names = context.assets.list("hymn/midi") ?: emptyArray()
+    fun midiPath(context: Context, book: SongBook, number: Int): String? {
+        val map = synchronized(midiCache) { midiCache[book] } ?: run {
+            val names = try {
+                context.assets.list("${book.dir}/midi") ?: emptyArray()
+            } catch (e: Exception) {
+                emptyArray()
+            }
             names.filter { it.endsWith(".mid", true) || it.endsWith(".midi", true) }
-                .mapNotNull { name -> name.substringBefore('.').toIntOrNull()?.let { it to "hymn/midi/$name" } }
+                .mapNotNull { name -> name.substringBefore('.').toIntOrNull()?.let { it to "${book.dir}/midi/$name" } }
                 .toMap()
-                .also { midiFiles = it }
+                .also { synchronized(midiCache) { midiCache[book] = it } }
         }
         return map[number]
     }
