@@ -26,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -107,7 +110,16 @@ fun HymnListScreen(
         if (hymns != null && query.isEmpty() && last > 3) listState.scrollToItem(last - 3)
     }
 
-    Scaffold(topBar = { BackTopBar("통일찬송가", onBack) }) { pad ->
+    var showSettings by remember { mutableStateOf(false) }
+    var fitScore by remember { mutableStateOf(prefs.fitScore) }
+
+    Scaffold(topBar = {
+        BackTopBar("통일찬송가", onBack, actions = {
+            IconButton(onClick = { showSettings = true }) {
+                Icon(Icons.Filled.Settings, contentDescription = "설정")
+            }
+        })
+    }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().imePadding()) {
             OutlinedTextField(
                 value = query,
@@ -152,6 +164,43 @@ fun HymnListScreen(
                 }
             }
         }
+    }
+
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("찬송가 설정") },
+            text = {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            fitScore = !fitScore
+                            prefs.fitScore = fitScore
+                        }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("큰 악보 화면 맞추기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "한 화면에 다 안 들어가는 악보를 줄여서 스크롤 없이 한 번에 보여줘요",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = fitScore,
+                        onCheckedChange = {
+                            fitScore = it
+                            prefs.fitScore = it
+                        },
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSettings = false }) { Text("닫기") } },
+        )
     }
 }
 
@@ -205,6 +254,7 @@ fun HymnViewerScreen(
     }
     val scope = rememberCoroutineScope()
     val midi = remember { MidiPlayer(context.applicationContext) }
+    val fitScore = remember { prefs.fitScore }
     DisposableEffect(Unit) { onDispose { midi.stop() } }
 
     val current = hymns?.getOrNull(pager.currentPage)
@@ -273,7 +323,7 @@ fun HymnViewerScreen(
                 beyondViewportPageCount = 1,
                 key = { hymns[it].number },
             ) { page ->
-                ZoomableScore(hymns[page].pages)
+                ZoomableScore(hymns[page].pages, fitScreen = fitScore)
             }
         }
     }

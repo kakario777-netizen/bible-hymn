@@ -1,11 +1,24 @@
 package com.kakario.biblehymn.data
 
 import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
 
-/** 마지막으로 읽은 위치, 글자 크기 등 간단한 설정 저장 */
+/** 성경 책갈피 하나 */
+data class Bookmark(
+    val id: Long,
+    val name: String,
+    val book: Int,
+    val chapter: Int,
+    val verse: Int,
+    val createdAt: Long,
+)
+
+/** 이어읽기 위치, 책갈피, 글자 크기 등 설정 저장 */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("bible_hymn", Context.MODE_PRIVATE)
 
+    // ── 이어읽기 (한 곳만, 성경 화면의 [이어읽기] 버튼으로 저장) ──
     var lastBook: Int
         get() = sp.getInt("lastBook", 0)
         set(v) = sp.edit().putInt("lastBook", v).apply()
@@ -14,6 +27,15 @@ class Prefs(context: Context) {
         get() = sp.getInt("lastChapter", 1)
         set(v) = sp.edit().putInt("lastChapter", v).apply()
 
+    var lastVerse: Int
+        get() = sp.getInt("lastVerse", 1)
+        set(v) = sp.edit().putInt("lastVerse", v).apply()
+
+    fun saveContinue(book: Int, chapter: Int, verse: Int) {
+        sp.edit().putInt("lastBook", book).putInt("lastChapter", chapter).putInt("lastVerse", verse).apply()
+    }
+
+    // ── 화면 설정 ──
     var fontSize: Float
         get() = sp.getFloat("fontSize", 19f)
         set(v) = sp.edit().putFloat("fontSize", v).apply()
@@ -21,4 +43,72 @@ class Prefs(context: Context) {
     var lastHymn: Int
         get() = sp.getInt("lastHymn", 0)
         set(v) = sp.edit().putInt("lastHymn", v).apply()
+
+    /** 큰 악보를 한 화면에 맞춰 축소 */
+    var fitScore: Boolean
+        get() = sp.getBoolean("fitScore", false)
+        set(v) = sp.edit().putBoolean("fitScore", v).apply()
+
+    /** 첫 화면 제목 밑 부제목 (비어 있으면 표시 안 함) */
+    var homeSubtitle: String
+        get() = sp.getString("homeSubtitle", "") ?: ""
+        set(v) = sp.edit().putString("homeSubtitle", v).apply()
+
+    // ── 책갈피 (개수 제한 없음) ──
+    fun bookmarks(): List<Bookmark> {
+        val raw = sp.getString("bookmarks", null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Bookmark(
+                    id = o.getLong("id"),
+                    name = o.getString("name"),
+                    book = o.getInt("book"),
+                    chapter = o.getInt("chapter"),
+                    verse = o.optInt("verse", 1),
+                    createdAt = o.optLong("createdAt", 0L),
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveBookmarks(list: List<Bookmark>) {
+        val arr = JSONArray()
+        list.forEach { b ->
+            arr.put(
+                JSONObject()
+                    .put("id", b.id)
+                    .put("name", b.name)
+                    .put("book", b.book)
+                    .put("chapter", b.chapter)
+                    .put("verse", b.verse)
+                    .put("createdAt", b.createdAt),
+            )
+        }
+        sp.edit().putString("bookmarks", arr.toString()).apply()
+    }
+
+    fun addBookmark(name: String, book: Int, chapter: Int, verse: Int) {
+        val now = System.currentTimeMillis()
+        saveBookmarks(bookmarks() + Bookmark(now, name, book, chapter, verse, now))
+    }
+
+    fun renameBookmark(id: Long, name: String) {
+        saveBookmarks(bookmarks().map { if (it.id == id) it.copy(name = name) else it })
+    }
+
+    fun deleteBookmark(id: Long) {
+        saveBookmarks(bookmarks().filter { it.id != id })
+    }
+
+    /** 새 책갈피 기본 이름: 책갈피 1, 책갈피 2 … (안 겹치게) */
+    fun nextBookmarkName(): String {
+        val names = bookmarks().map { it.name }.toSet()
+        var n = bookmarks().size + 1
+        while ("책갈피 $n" in names) n++
+        return "책갈피 $n"
+    }
 }

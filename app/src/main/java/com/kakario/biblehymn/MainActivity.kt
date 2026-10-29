@@ -19,6 +19,7 @@ import com.kakario.biblehymn.ui.AppTheme
 import com.kakario.biblehymn.ui.BibleBooksScreen
 import com.kakario.biblehymn.ui.BibleChaptersScreen
 import com.kakario.biblehymn.ui.BibleReaderScreen
+import com.kakario.biblehymn.ui.BookmarksScreen
 import com.kakario.biblehymn.ui.HomeScreen
 import com.kakario.biblehymn.ui.HymnListScreen
 import com.kakario.biblehymn.ui.HymnViewerScreen
@@ -28,7 +29,8 @@ sealed interface Screen {
     data object Home : Screen
     data object BibleBooks : Screen
     data class BibleChapters(val book: Int) : Screen
-    data class BibleReader(val book: Int, val chapter: Int) : Screen
+    data class BibleReader(val book: Int, val chapter: Int, val verse: Int = 1) : Screen
+    data object Bookmarks : Screen
     data object HymnList : Screen
     data class HymnViewer(val number: Int) : Screen
 }
@@ -71,10 +73,10 @@ private fun App() {
         Screen.Home -> HomeScreen(
             prefs = prefs,
             onBible = { push(Screen.BibleBooks) },
-            onContinueBible = { book, chapter ->
-                push(Screen.BibleBooks)
-                push(Screen.BibleReader(book, chapter))
+            onContinueBible = { book, chapter, verse ->
+                push(Screen.BibleReader(book, chapter, verse))
             },
+            onBookmarks = { push(Screen.Bookmarks) },
             onHymn = { push(Screen.HymnList) },
         )
 
@@ -92,15 +94,22 @@ private fun App() {
             onChapter = { push(Screen.BibleReader(screen.book, it)) },
         )
 
-        is Screen.BibleReader -> key(screen.book, screen.chapter) {
+        is Screen.BibleReader -> key(screen.book, screen.chapter, screen.verse) {
             BibleReaderScreen(
                 book = screen.book,
                 chapter = screen.chapter,
+                verse = screen.verse,
                 prefs = prefs,
                 onBack = ::pop,
                 onJump = { b, c -> replaceTop(Screen.BibleReader(b, c)) },
             )
         }
+
+        Screen.Bookmarks -> BookmarksScreen(
+            prefs = prefs,
+            onBack = ::pop,
+            onOpen = { b, c, v -> push(Screen.BibleReader(b, c, v)) },
+        )
 
         Screen.HymnList -> HymnListScreen(
             prefs = prefs,

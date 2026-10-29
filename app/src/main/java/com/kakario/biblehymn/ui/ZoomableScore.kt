@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,7 +51,13 @@ import kotlinx.coroutines.withContext
  * 확대하지 않은 상태에서는 한 손가락 좌우 스와이프가 옆 곡으로 넘어간다.
  */
 @Composable
-fun ZoomableScore(pages: List<String>, modifier: Modifier = Modifier) {
+fun ZoomableScore(pages: List<String>, fitScreen: Boolean, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val bitmaps by produceState(initialValue = pages.map { ScoreImages.cached(it) }, pages) {
+        if (value.any { it == null }) {
+            value = withContext(Dispatchers.IO) { pages.map { ScoreImages.load(context, it) } }
+        }
+    }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -110,7 +118,7 @@ fun ZoomableScore(pages: List<String>, modifier: Modifier = Modifier) {
                 })
             },
     ) {
-        Column(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
@@ -118,35 +126,34 @@ fun ZoomableScore(pages: List<String>, modifier: Modifier = Modifier) {
                     scaleY = scale
                     translationX = offset.x
                     translationY = offset.y
-                }
-                .verticalScroll(scroll)
-                .padding(vertical = 4.dp),
+                },
         ) {
-            pages.forEach { ScorePage(it) }
+            val loaded = bitmaps.filterNotNull()
+            if (loaded.size < pages.size) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                // 화면 너비에 맞췄을 때 전체 높이 → 화면보다 크면(설정 켰을 때) 한 화면에 들어오게 축소
+                val totalHeight = loaded.sumOf { (maxWidth.value * it.height / it.width).toDouble() }.toFloat()
+                val shrink = if (fitScreen && totalHeight > maxHeight.value) maxHeight.value / totalHeight else 1f
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scroll),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    loaded.forEach { b ->
+                        Image(
+                            bitmap = b,
+                            contentDescription = null,
+                            contentScale = ContentScale.FillWidth,
+                            filterQuality = FilterQuality.High,
+                            modifier = Modifier
+                                .width(maxWidth * shrink)
+                                .aspectRatio(b.width.toFloat() / b.height.toFloat()),
+                        )
+                    }
+                }
+            }
         }
-    }
-}
-
-@Composable
-private fun ScorePage(path: String) {
-    val context = LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(ScoreImages.cached(path), path) {
-        if (value == null) value = withContext(Dispatchers.IO) { ScoreImages.load(context, path) }
-    }
-    val b = bitmap
-    if (b == null) {
-        Box(Modifier.fillMaxWidth().aspectRatio(0.75f), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-    } else {
-        Image(
-            bitmap = b,
-            contentDescription = null,
-            contentScale = ContentScale.FillWidth,
-            filterQuality = FilterQuality.High,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(b.width.toFloat() / b.height.toFloat()),
-        )
     }
 }

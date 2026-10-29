@@ -1,6 +1,24 @@
 package com.kakario.biblehymn.ui
 
 import androidx.compose.foundation.background
+import android.widget.Toast
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import com.kakario.biblehymn.R
+import com.kakario.biblehymn.data.Bookmark
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +36,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -171,6 +188,7 @@ fun BibleChaptersScreen(
 fun BibleReaderScreen(
     book: Int,
     chapter: Int,
+    verse: Int,
     prefs: Prefs,
     onBack: () -> Unit,
     onJump: (book: Int, chapter: Int) -> Unit,
@@ -185,7 +203,7 @@ fun BibleReaderScreen(
     if (books == null || b == null || data == null) {
         Scaffold(topBar = { BackTopBar("", onBack) }) { pad -> Loading(Modifier.padding(pad)) }
     } else {
-        BibleReaderLoaded(books, b, data, chapter, prefs, onBack, onJump)
+        BibleReaderLoaded(books, b, data, chapter, verse, prefs, onBack, onJump)
     }
 }
 
@@ -195,20 +213,31 @@ private fun BibleReaderLoaded(
     b: BibleBook,
     data: List<List<Verse>>,
     chapter: Int,
+    verse: Int,
     prefs: Prefs,
     onBack: () -> Unit,
     onJump: (book: Int, chapter: Int) -> Unit,
 ) {
+    val context = LocalContext.current
     val book = b.index
     var fontSize by remember { mutableFloatStateOf(prefs.fontSize) }
     val pageCount = data.size.coerceAtLeast(1)
-    val pager = rememberPagerState(initialPage = (chapter - 1).coerceIn(0, pageCount - 1)) { pageCount }
+    val initialPage = (chapter - 1).coerceIn(0, pageCount - 1)
+    val pager = rememberPagerState(initialPage = initialPage) { pageCount }
     val scope = rememberCoroutineScope()
     val current = pager.currentPage + 1
+    var showBookmarkDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(book, current) {
-        prefs.lastBook = book
-        prefs.lastChapter = current
+    // 장마다 스크롤 위치 (처음 연 장은 지정한 절로 바로 이동)
+    val listStates = remember { mutableMapOf<Int, LazyListState>() }
+    fun listStateFor(page: Int): LazyListState = listStates.getOrPut(page) {
+        LazyListState(firstVisibleItemIndex = if (page == initialPage && verse > 1) verse else 0)
+    }
+    /** 지금 화면 맨 위에 보이는 절 번호 */
+    fun currentVerse(): Int {
+        val idx = listStates[pager.currentPage]?.firstVisibleItemIndex ?: 0
+        val count = data.getOrNull(pager.currentPage)?.size ?: 1
+        return idx.coerceIn(1, count.coerceAtLeast(1))
     }
 
     Scaffold(
@@ -217,14 +246,28 @@ private fun BibleReaderLoaded(
                 title = "${b.name} ${current}장",
                 onBack = onBack,
                 actions = {
-                    TextButton(onClick = {
-                        fontSize = (fontSize - 1f).coerceAtLeast(13f)
-                        prefs.fontSize = fontSize
-                    }) { Text("가-", fontSize = 15.sp) }
-                    TextButton(onClick = {
-                        fontSize = (fontSize + 1f).coerceAtMost(34f)
-                        prefs.fontSize = fontSize
-                    }) { Text("가+", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+                    IconLabelButton(R.drawable.ic_bookmark_continue, "이어읽기") {
+                        val v = currentVerse()
+                        prefs.saveContinue(book, current, v)
+                        Toast.makeText(context, "이어읽기 저장 · ${b.name} ${current}장 ${v}절", Toast.LENGTH_SHORT).show()
+                    }
+                    IconLabelButton(R.drawable.ic_bookmark_add, "책갈피") { showBookmarkDialog = true }
+                    TextButton(
+                        onClick = {
+                            fontSize = (fontSize - 1f).coerceAtLeast(13f)
+                            prefs.fontSize = fontSize
+                        },
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.widthIn(min = 40.dp),
+                    ) { Text("가-", fontSize = 14.sp) }
+                    TextButton(
+                        onClick = {
+                            fontSize = (fontSize + 1f).coerceAtMost(34f)
+                            prefs.fontSize = fontSize
+                        },
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.widthIn(min = 40.dp),
+                    ) { Text("가+", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                 },
             )
         },
@@ -278,14 +321,34 @@ private fun BibleReaderLoaded(
                 chapter = page + 1,
                 verses = data.getOrNull(page) ?: emptyList(),
                 fontSize = fontSize,
+                listState = listStateFor(page),
             )
         }
+    }
+
+    if (showBookmarkDialog) {
+        val v = remember { currentVerse() }
+        TextInputDialog(
+            title = "책갈피 저장 · ${b.name} ${current}장 ${v}절",
+            initial = remember { prefs.nextBookmarkName() },
+            onDismiss = { showBookmarkDialog = false },
+            onSave = { name ->
+                prefs.addBookmark(name.ifEmpty { prefs.nextBookmarkName() }, book, current, v)
+                showBookmarkDialog = false
+                Toast.makeText(context, "책갈피를 저장했어요", Toast.LENGTH_SHORT).show()
+            },
+        )
     }
 }
 
 @Composable
-private fun ChapterText(bookName: String, chapter: Int, verses: List<Verse>, fontSize: Float) {
-    val listState = rememberLazyListState()
+private fun ChapterText(
+    bookName: String,
+    chapter: Int,
+    verses: List<Verse>,
+    fontSize: Float,
+    listState: LazyListState,
+) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -318,6 +381,155 @@ private fun ChapterText(bookName: String, chapter: Int, verses: List<Verse>, fon
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+    }
+}
+
+/** 책갈피 화면: 맨 위 이어읽기(한 곳) + 책갈피 목록(무제한) */
+@Composable
+fun BookmarksScreen(
+    prefs: Prefs,
+    onBack: () -> Unit,
+    onOpen: (book: Int, chapter: Int, verse: Int) -> Unit,
+) {
+    val books = rememberBooks()
+    var marks by remember { mutableStateOf(prefs.bookmarks().sortedByDescending { it.createdAt }) }
+    var renaming by remember { mutableStateOf<Bookmark?>(null) }
+    var deleting by remember { mutableStateOf<Bookmark?>(null) }
+    fun refresh() {
+        marks = prefs.bookmarks().sortedByDescending { it.createdAt }
+    }
+    fun where(book: Int, chapter: Int, verse: Int): String {
+        val name = books?.firstOrNull { it.index == book }?.name ?: ""
+        return "$name ${chapter}장 ${verse}절"
+    }
+    val dateFmt = remember { SimpleDateFormat("yyyy.MM.dd", Locale.KOREA) }
+
+    Scaffold(topBar = { BackTopBar("책갈피", onBack) }) { pad ->
+        LazyColumn(
+            Modifier.padding(pad).fillMaxSize(),
+            contentPadding = PaddingValues(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item { SectionLabel("이어읽기") }
+            item {
+                val lb = prefs.lastBook
+                if (lb in 1..66) {
+                    MarkRow(
+                        icon = R.drawable.ic_bookmark_continue,
+                        title = "이어읽기",
+                        sub = where(lb, prefs.lastChapter, prefs.lastVerse),
+                        highlight = true,
+                        onClick = { onOpen(lb, prefs.lastChapter, prefs.lastVerse) },
+                    )
+                } else {
+                    EmptyNote("성경 화면 위쪽 [이어읽기]를 누르면 여기 저장돼요")
+                }
+            }
+            item { SectionLabel("책갈피 ${marks.size}개", Modifier.padding(top = 10.dp)) }
+            if (marks.isEmpty()) {
+                item { EmptyNote("성경 화면 위쪽 [책갈피]를 눌러 원하는 만큼 저장할 수 있어요") }
+            }
+            items(marks, key = { it.id }) { m ->
+                MarkRow(
+                    icon = R.drawable.ic_bookmark,
+                    title = m.name,
+                    sub = where(m.book, m.chapter, m.verse) + "  ·  " + dateFmt.format(Date(m.createdAt)),
+                    highlight = false,
+                    onClick = { onOpen(m.book, m.chapter, m.verse) },
+                    onEdit = { renaming = m },
+                    onDelete = { deleting = m },
+                )
+            }
+        }
+    }
+
+    renaming?.let { m ->
+        TextInputDialog(
+            title = "책갈피 이름 바꾸기",
+            initial = m.name,
+            onDismiss = { renaming = null },
+            onSave = { name ->
+                if (name.isNotEmpty()) prefs.renameBookmark(m.id, name)
+                renaming = null
+                refresh()
+            },
+        )
+    }
+    deleting?.let { m ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("책갈피 삭제") },
+            text = { Text("'${m.name}' 책갈피를 지울까요?") },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("취소") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    prefs.deleteBookmark(m.id)
+                    deleting = null
+                    refresh()
+                }) { Text("삭제") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(start = 4.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun EmptyNote(text: String) {
+    Text(
+        text,
+        fontSize = 14.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun MarkRow(
+    icon: Int,
+    title: String,
+    sub: String,
+    highlight: Boolean,
+    onClick: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (highlight) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painterResource(icon),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(sub, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (onEdit != null) {
+                IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "이름 바꾸기") }
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "삭제") }
             }
         }
     }
