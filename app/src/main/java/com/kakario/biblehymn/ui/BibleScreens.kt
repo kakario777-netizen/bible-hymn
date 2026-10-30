@@ -397,7 +397,7 @@ private fun BibleReaderLoaded(
 
 /** 상단바 'T' 글꼴 버튼 */
 @Composable
-private fun FontButton(selected: Boolean, onClick: () -> Unit) {
+internal fun FontButton(selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
@@ -426,7 +426,7 @@ internal fun StylePanel(
     Column(
         Modifier
             .fillMaxWidth()
-            .heightIn(max = 340.dp)
+            .heightIn(max = 460.dp)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {

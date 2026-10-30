@@ -15,7 +15,11 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.kakario.biblehymn.data.Prefs
 import com.kakario.biblehymn.data.Verse
+import com.kakario.biblehymn.R
 import com.kakario.biblehymn.ui.AppTheme
+import com.kakario.biblehymn.ui.BackTopBar
+import com.kakario.biblehymn.ui.FontButton
+import com.kakario.biblehymn.ui.IconLabelButton
 import com.kakario.biblehymn.ui.HomeScreen
 import com.kakario.biblehymn.ui.ReaderFonts
 import com.kakario.biblehymn.ui.ReaderStyle
@@ -84,6 +88,25 @@ class ScreenshotTest {
         paparazzi.snapshot {
             AppTheme(dark = true) {
                 Surface { HomeScreen(prefs, 2, {}, {}, { _, _, _ -> }, {}, {}, {}) }
+            }
+        }
+    }
+
+    @Test
+    fun readerTopBar() {
+        paparazzi.snapshot {
+            AppTheme(dark = false) {
+                Surface {
+                    Column {
+                        listOf("창세기 1장", "데살로니가전서 3장", "예레미야애가 5장").forEach { t ->
+                            BackTopBar(t, onBack = {}, actions = {
+                                IconLabelButton(R.drawable.ic_bookmark_continue, "이어읽기") {}
+                                IconLabelButton(R.drawable.ic_bookmark_add, "책갈피") {}
+                                FontButton(selected = false) {}
+                            })
+                        }
+                    }
+                }
             }
         }
     }

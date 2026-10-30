@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -278,8 +279,10 @@ private fun Modifier.leatherGrain(tint: Color): Modifier = drawWithCache {
     val ys = FloatArray(count) { rnd.nextFloat() * size.height }
     val rs = FloatArray(count) { (0.8f + rnd.nextFloat() * 1.8f) * 1.dp.toPx() }
     val dark = BooleanArray(count) { rnd.nextBoolean() }
-    val darkColor = tint.copy(alpha = 0.045f)
-    val lightColor = Color.White.copy(alpha = 0.07f)
+    // 배경이 어두우면(글자색이 밝으면) 알갱이를 더 옅게
+    val darkBg = tint.luminance() > 0.5f
+    val darkColor = if (darkBg) Color.Black.copy(alpha = 0.05f) else tint.copy(alpha = 0.035f)
+    val lightColor = Color.White.copy(alpha = if (darkBg) 0.025f else 0.06f)
     onDrawBehind {
         for (i in 0 until count) {
             drawCircle(if (dark[i]) darkColor else lightColor, radius = rs[i], center = Offset(xs[i], ys[i]))
