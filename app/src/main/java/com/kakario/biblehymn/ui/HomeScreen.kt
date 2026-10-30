@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -73,6 +75,7 @@ fun HomeScreen(
     var showSettings by remember { mutableStateOf(false) }
     var editSubtitle by remember { mutableStateOf(false) }
     var tapPaging by remember { mutableStateOf(prefs.tapPaging) }
+    var screenTimeout by remember { mutableStateOf(prefs.screenTimeout) }
 
     Column(
         Modifier
@@ -125,7 +128,7 @@ fun HomeScreen(
             onDismissRequest = { showSettings = false },
             title = { Text("설정") },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text("배경색", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                     listOf(0 to "시스템 설정", 1 to "흰색", 2 to "검은색").forEach { (mode, label) ->
                         Row(
@@ -136,6 +139,30 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(selected = themeMode == mode, onClick = { onThemeMode(mode) })
+                            Text(label, fontSize = 16.sp)
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                    Text("화면 자동 꺼짐", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "성경·악보를 보는 동안, 마지막으로 만진 뒤 이 시간까지 화면이 켜져 있어요",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    listOf(0 to "시스템 설정", 1 to "30분", 2 to "2시간", 3 to "안 꺼짐").forEach { (mode, label) ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    screenTimeout = mode
+                                    prefs.screenTimeout = mode
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = screenTimeout == mode, onClick = {
+                                screenTimeout = mode
+                                prefs.screenTimeout = mode
+                            })
                             Text(label, fontSize = 16.sp)
                         }
                     }

@@ -65,6 +65,11 @@ class Prefs(context: Context) {
         get() = sp.getFloat("sideMargin", 18f)
         set(v) = sp.edit().putFloat("sideMargin", v).apply()
 
+    /** 성경·악보 화면 꺼짐: 0 = 시스템 설정, 1 = 30분, 2 = 2시간, 3 = 안 꺼짐 */
+    var screenTimeout: Int
+        get() = sp.getInt("screenTimeout", 0)
+        set(v) = sp.edit().putInt("screenTimeout", v).apply()
+
     /** 화면 왼쪽/오른쪽을 터치하면 이전/다음으로 넘기기 */
     var tapPaging: Boolean
         get() = sp.getBoolean("tapPaging", false)

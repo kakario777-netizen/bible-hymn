@@ -2,6 +2,9 @@ package com.kakario.biblehymn
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.MotionEvent
+import com.kakario.biblehymn.ui.UserActivity
 import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +47,11 @@ sealed interface Screen {
 }
 
 class MainActivity : ComponentActivity() {
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        UserActivity.lastTouch = SystemClock.elapsedRealtime()
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

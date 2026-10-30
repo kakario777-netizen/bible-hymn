@@ -294,6 +294,7 @@ private fun BibleReaderLoaded(
     var showStyle by remember { mutableStateOf(false) }
     var showBookmarkDialog by remember { mutableStateOf(false) }
     val tapPaging = remember { prefs.tapPaging }
+    KeepScreenOn(remember { prefs.screenTimeout })
 
     // 장마다 스크롤 위치 (처음 연 장은 지정한 절로 바로 이동)
     val listStates = remember { mutableMapOf<Int, LazyListState>() }

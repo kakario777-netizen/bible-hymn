@@ -258,6 +258,7 @@ fun HymnViewerScreen(
     val scope = rememberCoroutineScope()
     val fitScore = remember { prefs.fitScore }
     val tapPaging = remember { prefs.tapPaging }
+    KeepScreenOn(remember { prefs.screenTimeout })
 
     val current = hymns?.getOrNull(pager.currentPage)
 
