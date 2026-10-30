@@ -51,7 +51,13 @@ import kotlinx.coroutines.withContext
  * 확대하지 않은 상태에서는 한 손가락 좌우 스와이프가 옆 곡으로 넘어간다.
  */
 @Composable
-fun ZoomableScore(pages: List<String>, fitScreen: Boolean, modifier: Modifier = Modifier) {
+fun ZoomableScore(
+    pages: List<String>,
+    fitScreen: Boolean,
+    modifier: Modifier = Modifier,
+    /** 좌우 터치 넘기기: -1 = 왼쪽, +1 = 오른쪽 (null이면 사용 안 함) */
+    onTapSide: ((Int) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val bitmaps by produceState(initialValue = pages.map { ScoreImages.cached(it) }, pages) {
         if (value.any { it == null }) {
@@ -102,8 +108,18 @@ fun ZoomableScore(pages: List<String>, fitScreen: Boolean, modifier: Modifier = 
                     } while (event.changes.any { it.pressed })
                 }
             }
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { tap ->
+            .pointerInput(onTapSide != null) {
+                detectTapGestures(
+                    onTap = { tap ->
+                        val cb = onTapSide
+                        if (cb != null && scale <= 1.01f) {
+                            when {
+                                tap.x < size.width * 0.3f -> cb(-1)
+                                tap.x > size.width * 0.7f -> cb(1)
+                            }
+                        }
+                    },
+                    onDoubleTap = { tap ->
                     if (scale > 1.01f) {
                         scale = 1f
                         offset = Offset.Zero

@@ -40,6 +40,36 @@ class Prefs(context: Context) {
         get() = sp.getFloat("fontSize", 19f)
         set(v) = sp.edit().putFloat("fontSize", v).apply()
 
+    // ── 성경 글꼴 상세 설정 ──
+    /** 0 = 시스템 기본, 1 = 나눔고딕, 2 = 나눔명조, 3 = 고운바탕 */
+    var fontFamily: Int
+        get() = sp.getInt("fontFamily", 0)
+        set(v) = sp.edit().putInt("fontFamily", v).apply()
+
+    var fontBold: Boolean
+        get() = sp.getBoolean("fontBold", false)
+        set(v) = sp.edit().putBoolean("fontBold", v).apply()
+
+    /** 줄 간격 (글자 크기의 배수) */
+    var lineSpacing: Float
+        get() = sp.getFloat("lineSpacing", 1.65f)
+        set(v) = sp.edit().putFloat("lineSpacing", v).apply()
+
+    /** 절과 절 사이 간격 (dp) */
+    var verseGap: Float
+        get() = sp.getFloat("verseGap", 10f)
+        set(v) = sp.edit().putFloat("verseGap", v).apply()
+
+    /** 좌우 여백 (dp) */
+    var sideMargin: Float
+        get() = sp.getFloat("sideMargin", 18f)
+        set(v) = sp.edit().putFloat("sideMargin", v).apply()
+
+    /** 화면 왼쪽/오른쪽을 터치하면 이전/다음으로 넘기기 */
+    var tapPaging: Boolean
+        get() = sp.getBoolean("tapPaging", false)
+        set(v) = sp.edit().putBoolean("tapPaging", v).apply()
+
     var lastHymn: Int
         get() = sp.getInt("lastHymn", 0)
         set(v) = sp.edit().putInt("lastHymn", v).apply()

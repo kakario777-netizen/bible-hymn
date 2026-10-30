@@ -2,6 +2,16 @@ package com.kakario.biblehymn.ui
 
 import androidx.compose.foundation.background
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -183,7 +193,44 @@ fun BibleChaptersScreen(
     }
 }
 
-/** 성경 본문 — 좌우로 넘기면 이전/다음 장 */
+/** 성경 본문 글꼴 목록 (설정값 순서와 같음) */
+private val ReaderFonts: List<Pair<String, FontFamily>> = listOf(
+    "기본" to FontFamily.Default,
+    "나눔고딕" to FontFamily(Font(R.font.nanum_gothic)),
+    "나눔명조" to FontFamily(Font(R.font.nanum_myeongjo)),
+    "고운바탕" to FontFamily(Font(R.font.gowun_batang)),
+)
+
+/** 성경 본문 모양 */
+private data class ReaderStyle(
+    val size: Float,
+    val family: Int,
+    val bold: Boolean,
+    val lineSpacing: Float,
+    val verseGap: Float,
+    val sideMargin: Float,
+) {
+    val fontFamily: FontFamily get() = ReaderFonts.getOrNull(family)?.second ?: FontFamily.Default
+    val weight: FontWeight get() = if (bold) FontWeight.Bold else FontWeight.Normal
+
+    fun save(prefs: Prefs) {
+        prefs.fontSize = size
+        prefs.fontFamily = family
+        prefs.fontBold = bold
+        prefs.lineSpacing = lineSpacing
+        prefs.verseGap = verseGap
+        prefs.sideMargin = sideMargin
+    }
+
+    companion object {
+        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f)
+        fun load(prefs: Prefs) = ReaderStyle(
+            prefs.fontSize, prefs.fontFamily, prefs.fontBold, prefs.lineSpacing, prefs.verseGap, prefs.sideMargin,
+        )
+    }
+}
+
+/** 성경 본문 — 성경 전체가 한 줄로 이어져서 좌우로 넘기면 다음 권까지 계속 넘어감 */
 @Composable
 fun BibleReaderScreen(
     book: Int,
@@ -191,149 +238,147 @@ fun BibleReaderScreen(
     verse: Int,
     prefs: Prefs,
     onBack: () -> Unit,
-    onJump: (book: Int, chapter: Int) -> Unit,
 ) {
-    val context = LocalContext.current
     val books = rememberBooks()
-    val chapters by produceState<List<List<Verse>>?>(null, book) {
-        value = withContext(Dispatchers.IO) { Bible.chapters(context, book) }
-    }
-    val b = books?.firstOrNull { it.index == book }
-    val data = chapters
-    if (books == null || b == null || data == null) {
+    if (books == null) {
         Scaffold(topBar = { BackTopBar("", onBack) }) { pad -> Loading(Modifier.padding(pad)) }
     } else {
-        BibleReaderLoaded(books, b, data, chapter, verse, prefs, onBack, onJump)
+        BibleReaderLoaded(books, book, chapter, verse, prefs, onBack)
     }
 }
 
 @Composable
 private fun BibleReaderLoaded(
     books: List<BibleBook>,
-    b: BibleBook,
-    data: List<List<Verse>>,
-    chapter: Int,
-    verse: Int,
+    startBook: Int,
+    startChapter: Int,
+    startVerse: Int,
     prefs: Prefs,
     onBack: () -> Unit,
-    onJump: (book: Int, chapter: Int) -> Unit,
 ) {
     val context = LocalContext.current
-    val book = b.index
-    var fontSize by remember { mutableFloatStateOf(prefs.fontSize) }
-    val pageCount = data.size.coerceAtLeast(1)
-    val initialPage = (chapter - 1).coerceIn(0, pageCount - 1)
-    val pager = rememberPagerState(initialPage = initialPage) { pageCount }
+    // 각 권의 첫 장이 전체에서 몇 번째 페이지인지
+    val firstPage = remember(books) {
+        val arr = IntArray(books.size)
+        var acc = 0
+        books.forEachIndexed { i, b -> arr[i] = acc; acc += b.chapterCount }
+        arr
+    }
+    val total = remember(books) { books.sumOf { it.chapterCount } }
+    fun locate(page: Int): Pair<BibleBook, Int> {
+        var i = firstPage.size - 1
+        while (i > 0 && firstPage[i] > page) i--
+        return books[i] to (page - firstPage[i] + 1)
+    }
+    val startIdx = books.indexOfFirst { it.index == startBook }.coerceAtLeast(0)
+    val initialPage = (firstPage[startIdx] + startChapter - 1).coerceIn(0, total - 1)
+
+    val pager = rememberPagerState(initialPage = initialPage) { total }
     val scope = rememberCoroutineScope()
-    val current = pager.currentPage + 1
+    val (curBook, curChapter) = locate(pager.currentPage)
+
+    var style by remember { mutableStateOf(ReaderStyle.load(prefs)) }
+    fun updateStyle(s: ReaderStyle) {
+        style = s
+        s.save(prefs)
+    }
+    var showStyle by remember { mutableStateOf(false) }
     var showBookmarkDialog by remember { mutableStateOf(false) }
+    val tapPaging = remember { prefs.tapPaging }
 
     // 장마다 스크롤 위치 (처음 연 장은 지정한 절로 바로 이동)
     val listStates = remember { mutableMapOf<Int, LazyListState>() }
     fun listStateFor(page: Int): LazyListState = listStates.getOrPut(page) {
-        LazyListState(firstVisibleItemIndex = if (page == initialPage && verse > 1) verse else 0)
+        LazyListState(firstVisibleItemIndex = if (page == initialPage && startVerse > 1) startVerse else 0)
     }
-    /** 지금 화면 맨 위에 보이는 절 번호 */
-    fun currentVerse(): Int {
-        val idx = listStates[pager.currentPage]?.firstVisibleItemIndex ?: 0
-        val count = data.getOrNull(pager.currentPage)?.size ?: 1
-        return idx.coerceIn(1, count.coerceAtLeast(1))
+    /** 지금 화면 맨 위에 보이는 절 번호 (0번 항목은 장 제목) */
+    fun currentVerse(): Int = (listStates[pager.currentPage]?.firstVisibleItemIndex ?: 0).coerceAtLeast(1)
+
+    fun goPage(p: Int) {
+        if (p in 0 until total) scope.launch { pager.animateScrollToPage(p) }
     }
 
     Scaffold(
         topBar = {
             BackTopBar(
-                title = "${b.name} ${current}장",
+                title = "${curBook.name} ${curChapter}장",
                 onBack = onBack,
                 actions = {
                     IconLabelButton(R.drawable.ic_bookmark_continue, "이어읽기") {
                         val v = currentVerse()
-                        prefs.saveContinue(book, current, v)
-                        Toast.makeText(context, "이어읽기 저장 · ${b.name} ${current}장 ${v}절", Toast.LENGTH_SHORT).show()
+                        prefs.saveContinue(curBook.index, curChapter, v)
+                        Toast.makeText(context, "이어읽기 저장 · ${curBook.name} ${curChapter}장 ${v}절", Toast.LENGTH_SHORT).show()
                     }
                     IconLabelButton(R.drawable.ic_bookmark_add, "책갈피") { showBookmarkDialog = true }
-                    TextButton(
-                        onClick = {
-                            fontSize = (fontSize - 1f).coerceAtLeast(13f)
-                            prefs.fontSize = fontSize
-                        },
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.widthIn(min = 40.dp),
-                    ) { Text("가-", fontSize = 14.sp) }
-                    TextButton(
-                        onClick = {
-                            fontSize = (fontSize + 1f).coerceAtMost(34f)
-                            prefs.fontSize = fontSize
-                        },
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.widthIn(min = 40.dp),
-                    ) { Text("가+", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    FontButton(selected = showStyle) { showStyle = !showStyle }
                 },
             )
         },
         bottomBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
                 HorizontalDivider()
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(
-                        enabled = !(book == 1 && current == 1),
-                        onClick = {
-                            if (current > 1) {
-                                scope.launch { pager.animateScrollToPage(current - 2) }
-                            } else {
-                                val prev = books.firstOrNull { it.index == book - 1 }
-                                if (prev != null) onJump(prev.index, prev.chapterCount)
-                            }
-                        },
-                    ) { Text("◀ 이전 장") }
-                    Text(
-                        "$current / $pageCount",
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
+                if (showStyle) {
+                    StylePanel(
+                        style = style,
+                        onChange = ::updateStyle,
+                        onReset = { updateStyle(ReaderStyle.Default) },
+                        onClose = { showStyle = false },
                     )
-                    TextButton(
-                        enabled = !(book == 66 && current == pageCount),
-                        onClick = {
-                            if (current < pageCount) {
-                                scope.launch { pager.animateScrollToPage(current) }
-                            } else if (book < 66) {
-                                onJump(book + 1, 1)
-                            }
-                        },
-                    ) { Text("다음 장 ▶") }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            enabled = pager.currentPage > 0,
+                            onClick = { goPage(pager.currentPage - 1) },
+                        ) { Text("◀ 이전 장") }
+                        Text(
+                            "$curChapter / ${curBook.chapterCount}",
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                        )
+                        TextButton(
+                            enabled = pager.currentPage < total - 1,
+                            onClick = { goPage(pager.currentPage + 1) },
+                        ) { Text("다음 장 ▶") }
+                    }
                 }
             }
         },
     ) { pad ->
         HorizontalPager(
             state = pager,
-            modifier = Modifier.padding(pad).fillMaxSize(),
+            modifier = Modifier
+                .padding(pad)
+                .fillMaxSize()
+                .pointerInput(tapPaging) {
+                    if (tapPaging) {
+                        detectTapGestures(onTap = { o ->
+                            when {
+                                o.x < size.width * 0.3f -> goPage(pager.currentPage - 1)
+                                o.x > size.width * 0.7f -> goPage(pager.currentPage + 1)
+                            }
+                        })
+                    }
+                },
             beyondViewportPageCount = 1,
-            key = { "$book-$it" },
         ) { page ->
-            ChapterText(
-                bookName = b.name,
-                chapter = page + 1,
-                verses = data.getOrNull(page) ?: emptyList(),
-                fontSize = fontSize,
-                listState = listStateFor(page),
-            )
+            val (b, c) = locate(page)
+            ChapterPage(b, c, style, listStateFor(page))
         }
     }
 
     if (showBookmarkDialog) {
         val v = remember { currentVerse() }
         TextInputDialog(
-            title = "책갈피 저장 · ${b.name} ${current}장 ${v}절",
+            title = "책갈피 저장 · ${curBook.name} ${curChapter}장 ${v}절",
             initial = remember { prefs.nextBookmarkName() },
             onDismiss = { showBookmarkDialog = false },
             onSave = { name ->
-                prefs.addBookmark(name.ifEmpty { prefs.nextBookmarkName() }, book, current, v)
+                prefs.addBookmark(name.ifEmpty { prefs.nextBookmarkName() }, curBook.index, curChapter, v)
                 showBookmarkDialog = false
                 Toast.makeText(context, "책갈피를 저장했어요", Toast.LENGTH_SHORT).show()
             },
@@ -341,43 +386,178 @@ private fun BibleReaderLoaded(
     }
 }
 
+/** 상단바 'T' 글꼴 버튼 */
 @Composable
-private fun ChapterText(
-    bookName: String,
-    chapter: Int,
-    verses: List<Verse>,
-    fontSize: Float,
-    listState: LazyListState,
+private fun FontButton(selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.widthIn(min = 46.dp),
+    ) {
+        Column(
+            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("T", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif, lineHeight = 24.sp)
+            Text("글꼴", fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+/** 아래에서 올라오는 글꼴 상세 설정 — 바꾸는 즉시 위 본문에 반영 */
+@Composable
+private fun StylePanel(
+    style: ReaderStyle,
+    onChange: (ReaderStyle) -> Unit,
+    onReset: () -> Unit,
+    onClose: () -> Unit,
 ) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(max = 340.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = onReset) { Text("기본값") }
+            TextButton(onClick = onClose) { Text("완료", fontWeight = FontWeight.Bold) }
+        }
+
+        PanelLabel("글꼴")
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            ReaderFonts.forEachIndexed { i, (name, family) ->
+                ChoiceChip(name, selected = style.family == i, fontFamily = family) { onChange(style.copy(family = i)) }
+                Spacer(Modifier.width(8.dp))
+            }
+        }
+
+        PanelLabel("굵기")
+        Row {
+            ChoiceChip("보통", selected = !style.bold) { onChange(style.copy(bold = false)) }
+            Spacer(Modifier.width(8.dp))
+            ChoiceChip("굵게", selected = style.bold, bold = true) { onChange(style.copy(bold = true)) }
+        }
+
+        SliderRow("글자 크기", "${style.size.toInt()}", style.size, 13f..34f, 20) {
+            onChange(style.copy(size = it))
+        }
+        SliderRow("줄 간격", String.format(Locale.US, "%.1f", style.lineSpacing), style.lineSpacing, 1.2f..2.4f, 11) {
+            onChange(style.copy(lineSpacing = it))
+        }
+        SliderRow("절 간격", "${style.verseGap.toInt()}", style.verseGap, 0f..28f, 13) {
+            onChange(style.copy(verseGap = it))
+        }
+        SliderRow("좌우 여백", "${style.sideMargin.toInt()}", style.sideMargin, 4f..48f, 10) {
+            onChange(style.copy(sideMargin = it))
+        }
+    }
+}
+
+@Composable
+private fun PanelLabel(text: String) {
+    Text(
+        text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    fontFamily: FontFamily? = null,
+    bold: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            label,
+            fontSize = 15.sp,
+            fontFamily = fontFamily,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+        )
+    }
+}
+
+@Composable
+private fun SliderRow(
+    label: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onChange: (Float) -> Unit,
+) {
+    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(64.dp))
+        Slider(
+            value = value.coerceIn(range.start, range.endInclusive),
+            onValueChange = onChange,
+            valueRange = range,
+            steps = steps,
+            modifier = Modifier.weight(1f).height(32.dp),
+        )
+        Text(valueText, fontSize = 13.sp, textAlign = TextAlign.End, modifier = Modifier.width(34.dp))
+    }
+}
+
+@Composable
+private fun ChapterPage(book: BibleBook, chapter: Int, style: ReaderStyle, listState: LazyListState) {
+    val context = LocalContext.current
+    val verses by produceState<List<Verse>?>(null, book.index, chapter) {
+        value = withContext(Dispatchers.IO) { Bible.chapters(context, book.index).getOrNull(chapter - 1) ?: emptyList() }
+    }
+    val list = verses
+    if (list == null) {
+        Loading()
+        return
+    }
+    val lh = (style.size * style.lineSpacing).sp
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 20.dp, top = 12.dp, bottom = 40.dp),
+        contentPadding = PaddingValues(start = style.sideMargin.dp, end = (style.sideMargin + 2f).dp, top = 12.dp, bottom = 40.dp),
     ) {
         item {
             Text(
-                "$bookName 제${chapter}장",
-                fontSize = (fontSize + 3).sp,
+                "${book.name} 제${chapter}장",
+                fontSize = (style.size + 3).sp,
                 fontWeight = FontWeight.Bold,
+                fontFamily = style.fontFamily,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 14.dp),
             )
         }
-        items(verses, key = { it.number }) { v ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        items(list, key = { it.number }) { v ->
+            Row(Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp)) {
                 Text(
                     "${v.number}",
-                    fontSize = (fontSize * 0.72f).sp,
-                    lineHeight = (fontSize * 1.65f).sp,
+                    fontSize = (style.size * 0.72f).sp,
+                    lineHeight = lh,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.width((fontSize * 1.7f).dp).padding(end = 8.dp, top = 2.dp),
+                    modifier = Modifier.width((style.size * 1.7f).dp).padding(end = 8.dp, top = 2.dp),
                 )
                 Text(
                     v.text,
-                    fontSize = fontSize.sp,
-                    lineHeight = (fontSize * 1.65f).sp,
+                    fontSize = style.size.sp,
+                    lineHeight = lh,
+                    fontFamily = style.fontFamily,
+                    fontWeight = style.weight,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f),
                 )

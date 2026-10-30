@@ -134,7 +134,6 @@ private fun App(prefs: Prefs, themeMode: Int, onThemeMode: (Int) -> Unit) {
                 verse = screen.verse,
                 prefs = prefs,
                 onBack = ::pop,
-                onJump = { b, c -> replaceTop(Screen.BibleReader(b, c)) },
             )
         }
 

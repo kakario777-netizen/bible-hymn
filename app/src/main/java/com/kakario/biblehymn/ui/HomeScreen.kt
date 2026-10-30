@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -69,6 +71,7 @@ fun HomeScreen(
     var subtitle by remember { mutableStateOf(prefs.homeSubtitle) }
     var showSettings by remember { mutableStateOf(false) }
     var editSubtitle by remember { mutableStateOf(false) }
+    var tapPaging by remember { mutableStateOf(prefs.tapPaging) }
 
     Column(
         Modifier
@@ -136,6 +139,32 @@ fun HomeScreen(
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                tapPaging = !tapPaging
+                                prefs.tapPaging = tapPaging
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("좌우 터치로 넘기기", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                "성경·악보 화면 왼쪽/오른쪽을 누르면 이전/다음으로",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = tapPaging,
+                            onCheckedChange = {
+                                tapPaging = it
+                                prefs.tapPaging = it
+                            },
+                        )
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
                     Text("부제목", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                     Row(
                         Modifier
@@ -194,7 +223,7 @@ private fun StrongChip(icon: Int, label: String, onClick: () -> Unit) {
 
 // ───────────────────────── 성경 카드 ─────────────────────────
 
-/** 성경: 가죽 성경 표지처럼 가장자리 스티치 + 오른쪽에 반투명 스티치 성경책 */
+/** 성경: 아주 옅은 가죽 질감 + 가장자리 스티치 */
 @Composable
 private fun BibleCard(
     modifier: Modifier,
@@ -212,20 +241,13 @@ private fun BibleCard(
         Box(
             Modifier
                 .fillMaxSize()
+                .leatherGrain(on)
                 .drawBehind { stitchBorder(on.copy(alpha = 0.28f), inset = 7.dp.toPx(), radius = 16.dp.toPx()) },
         ) {
-            StitchedBible(
-                color = on,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 22.dp)
-                    .width(78.dp)
-                    .height(100.dp),
-            )
             Column(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 24.dp, end = 110.dp),
+                    .padding(horizontal = 24.dp),
             ) {
                 Text("성경", fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text(
@@ -244,6 +266,27 @@ private fun BibleCard(
     }
 }
 
+/**
+ * 아주 옅은 가죽 질감: 작은 알갱이(밝은 점·어두운 점)를 고르게 흩뿌림.
+ * 위치는 항상 같게(고정 시드) 계산해서 한 번만 만든다.
+ */
+private fun Modifier.leatherGrain(tint: Color): Modifier = drawWithCache {
+    val rnd = java.util.Random(7L)
+    val density = 1f / (9.dp.toPx() * 9.dp.toPx())
+    val count = (size.width * size.height * density).toInt().coerceAtMost(6000)
+    val xs = FloatArray(count) { rnd.nextFloat() * size.width }
+    val ys = FloatArray(count) { rnd.nextFloat() * size.height }
+    val rs = FloatArray(count) { (0.8f + rnd.nextFloat() * 1.8f) * 1.dp.toPx() }
+    val dark = BooleanArray(count) { rnd.nextBoolean() }
+    val darkColor = tint.copy(alpha = 0.045f)
+    val lightColor = Color.White.copy(alpha = 0.07f)
+    onDrawBehind {
+        for (i in 0 until count) {
+            drawCircle(if (dark[i]) darkColor else lightColor, radius = rs[i], center = Offset(xs[i], ys[i]))
+        }
+    }
+}
+
 /** 카드 가장자리를 따라 도는 점선 박음질 */
 private fun DrawScope.stitchBorder(color: Color, inset: Float, radius: Float) {
     drawRoundRect(
@@ -258,57 +301,9 @@ private fun DrawScope.stitchBorder(color: Color, inset: Float, radius: Float) {
     )
 }
 
-/** 반투명 가죽 성경책: 책등, 스티치 테두리, 표지 십자가 */
-@Composable
-private fun StitchedBible(color: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val r = 7.dp.toPx()
-        val spine = w * 0.16f
-        // 표지 (투명하게)
-        drawRoundRect(color.copy(alpha = 0.10f), cornerRadius = CornerRadius(r))
-        drawRoundRect(color.copy(alpha = 0.22f), cornerRadius = CornerRadius(r), style = Stroke(1.2.dp.toPx()))
-        // 책등
-        drawRoundRect(
-            color.copy(alpha = 0.10f),
-            size = Size(spine, h),
-            cornerRadius = CornerRadius(r),
-        )
-        drawLine(color.copy(alpha = 0.22f), Offset(spine, 0f), Offset(spine, h), strokeWidth = 1.dp.toPx())
-        // 책등 가로 줄
-        listOf(0.14f, 0.20f, 0.80f, 0.86f).forEach { y ->
-            drawLine(color.copy(alpha = 0.22f), Offset(2.dp.toPx(), h * y), Offset(spine - 2.dp.toPx(), h * y), strokeWidth = 1.dp.toPx())
-        }
-        // 표지 스티치
-        val ins = 5.dp.toPx()
-        drawRoundRect(
-            color.copy(alpha = 0.38f),
-            topLeft = Offset(spine + ins, ins),
-            size = Size(w - spine - ins * 2, h - ins * 2),
-            cornerRadius = CornerRadius(r * 0.6f),
-            style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 2.5.dp.toPx()))),
-        )
-        // 십자가
-        val cx = spine + (w - spine) / 2f
-        val cy = h * 0.42f
-        val arm = 2.6.dp.toPx()
-        val c = color.copy(alpha = 0.40f)
-        drawRoundRect(c, topLeft = Offset(cx - arm / 2, cy - h * 0.17f), size = Size(arm, h * 0.36f), cornerRadius = CornerRadius(arm / 2))
-        drawRoundRect(c, topLeft = Offset(cx - w * 0.17f, cy - h * 0.08f), size = Size(w * 0.34f, arm), cornerRadius = CornerRadius(arm / 2))
-        // 지퍼 손잡이 느낌의 작은 고리
-        drawRoundRect(
-            color.copy(alpha = 0.30f),
-            topLeft = Offset(spine * 0.25f, h * 0.88f),
-            size = Size(spine * 0.5f, h * 0.10f),
-            cornerRadius = CornerRadius(2.dp.toPx()),
-        )
-    }
-}
-
 // ───────────────────────── 찬송가 카드 ─────────────────────────
 
-/** 찬송가: 가운데 위쪽에 반투명 피아노 건반(도~솔, 검은건반 포함) */
+/** 찬송가: 제목 왼쪽, 음표 오른쪽 */
 @Composable
 private fun HymnCard(modifier: Modifier, onClick: () -> Unit) {
     val on = MaterialTheme.colorScheme.onSecondaryContainer
@@ -318,20 +313,13 @@ private fun HymnCard(modifier: Modifier, onClick: () -> Unit) {
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = on),
     ) {
-        Box(Modifier.fillMaxSize()) {
-            PianoKeys(
-                color = on,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 14.dp)
-                    .width(150.dp)
-                    .height(54.dp),
-            )
-            Column(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 24.dp, bottom = 20.dp, end = 24.dp),
-            ) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
                 Text("찬송가", fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text(
                     "통일찬송가 558장 · 악보",
@@ -340,45 +328,7 @@ private fun HymnCard(modifier: Modifier, onClick: () -> Unit) {
                     color = on.copy(alpha = 0.75f),
                 )
             }
-        }
-    }
-}
-
-/** 흰 건반 5개(도레미파솔) + 검은 건반 3개(도#·레#·파#) — 반투명 */
-@Composable
-private fun PianoKeys(color: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val n = 5
-        val gap = 2.dp.toPx()
-        val kw = (size.width - gap * (n - 1)) / n
-        val kh = size.height
-        val r = 5.dp.toPx()
-        for (i in 0 until n) {
-            val x = i * (kw + gap)
-            val path = Path().apply {
-                // 위는 각지고 아래만 둥근 건반
-                moveTo(x, 0f)
-                lineTo(x + kw, 0f)
-                lineTo(x + kw, kh - r)
-                quadraticBezierTo(x + kw, kh, x + kw - r, kh)
-                lineTo(x + r, kh)
-                quadraticBezierTo(x, kh, x, kh - r)
-                close()
-            }
-            drawPath(path, Color.White.copy(alpha = 0.55f))
-            drawPath(path, color.copy(alpha = 0.22f), style = Stroke(1.dp.toPx()))
-        }
-        // 검은 건반: 도-레, 레-미, 파-솔 사이
-        val bw = kw * 0.58f
-        val bh = kh * 0.60f
-        listOf(1, 2, 4).forEach { k ->
-            val cx = k * (kw + gap) - gap / 2
-            drawRoundRect(
-                color.copy(alpha = 0.55f),
-                topLeft = Offset(cx - bw / 2, 0f),
-                size = Size(bw, bh),
-                cornerRadius = CornerRadius(3.dp.toPx()),
-            )
+            Text("♪", fontSize = 48.sp, color = on.copy(alpha = 0.35f))
         }
     }
 }

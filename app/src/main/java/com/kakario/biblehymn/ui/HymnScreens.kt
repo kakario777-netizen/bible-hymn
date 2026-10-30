@@ -257,6 +257,7 @@ fun HymnViewerScreen(
     }
     val scope = rememberCoroutineScope()
     val fitScore = remember { prefs.fitScore }
+    val tapPaging = remember { prefs.tapPaging }
 
     val current = hymns?.getOrNull(pager.currentPage)
 
@@ -309,7 +310,18 @@ fun HymnViewerScreen(
             ) { page ->
                 val h = hymns[page]
                 if (h.hasScore) {
-                    ZoomableScore(h.pages, fitScreen = fitScore)
+                    ZoomableScore(
+                        h.pages,
+                        fitScreen = fitScore,
+                        onTapSide = if (tapPaging) {
+                            { dir ->
+                                val target = pager.currentPage + dir
+                                if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
+                            }
+                        } else {
+                            null
+                        },
+                    )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
