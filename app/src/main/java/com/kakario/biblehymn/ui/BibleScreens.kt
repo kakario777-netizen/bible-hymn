@@ -194,15 +194,24 @@ fun BibleChaptersScreen(
 }
 
 /** 성경 본문 글꼴 목록 (설정값 순서와 같음) */
-private val ReaderFonts: List<Pair<String, FontFamily>> = listOf(
+internal val ReaderFonts: List<Pair<String, FontFamily>> = listOf(
     "기본" to FontFamily.Default,
-    "나눔고딕" to FontFamily(Font(R.font.nanum_gothic)),
-    "나눔명조" to FontFamily(Font(R.font.nanum_myeongjo)),
-    "고운바탕" to FontFamily(Font(R.font.gowun_batang)),
+    "나눔고딕" to FontFamily(
+        Font(R.font.nanum_gothic, FontWeight.Normal),
+        Font(R.font.nanum_gothic_bold, FontWeight.Bold),
+    ),
+    "나눔명조" to FontFamily(
+        Font(R.font.nanum_myeongjo, FontWeight.Normal),
+        Font(R.font.nanum_myeongjo_bold, FontWeight.Bold),
+    ),
+    "고운바탕" to FontFamily(
+        Font(R.font.gowun_batang, FontWeight.Normal),
+        Font(R.font.gowun_batang_bold, FontWeight.Bold),
+    ),
 )
 
 /** 성경 본문 모양 */
-private data class ReaderStyle(
+internal data class ReaderStyle(
     val size: Float,
     val family: Int,
     val bold: Boolean,
@@ -408,7 +417,7 @@ private fun FontButton(selected: Boolean, onClick: () -> Unit) {
 
 /** 아래에서 올라오는 글꼴 상세 설정 — 바꾸는 즉시 위 본문에 반영 */
 @Composable
-private fun StylePanel(
+internal fun StylePanel(
     style: ReaderStyle,
     onChange: (ReaderStyle) -> Unit,
     onReset: () -> Unit,
@@ -525,7 +534,6 @@ private fun ChapterPage(book: BibleBook, chapter: Int, style: ReaderStyle, listS
         Loading()
         return
     }
-    val lh = (style.size * style.lineSpacing).sp
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -541,28 +549,33 @@ private fun ChapterPage(book: BibleBook, chapter: Int, style: ReaderStyle, listS
                 modifier = Modifier.padding(bottom = 14.dp),
             )
         }
-        items(list, key = { it.number }) { v ->
-            Row(Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp)) {
-                Text(
-                    "${v.number}",
-                    fontSize = (style.size * 0.72f).sp,
-                    lineHeight = lh,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width((style.size * 1.7f).dp).padding(end = 8.dp, top = 2.dp),
-                )
-                Text(
-                    v.text,
-                    fontSize = style.size.sp,
-                    lineHeight = lh,
-                    fontFamily = style.fontFamily,
-                    fontWeight = style.weight,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        items(list, key = { it.number }) { v -> VerseRow(v, style) }
+    }
+}
+
+/** 절 한 줄: 번호 + 본문 */
+@Composable
+internal fun VerseRow(v: Verse, style: ReaderStyle) {
+    val lh = (style.size * style.lineSpacing).sp
+    Row(Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp)) {
+        Text(
+            "${v.number}",
+            fontSize = (style.size * 0.72f).sp,
+            lineHeight = lh,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width((style.size * 1.7f).dp).padding(end = 8.dp, top = 2.dp),
+        )
+        Text(
+            v.text,
+            fontSize = style.size.sp,
+            lineHeight = lh,
+            fontFamily = style.fontFamily,
+            fontWeight = style.weight,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

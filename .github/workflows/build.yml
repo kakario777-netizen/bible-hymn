@@ -45,18 +45,28 @@ jobs:
             --notes "커밋: ${{ github.sha }} — 폰에서 bible-hymn.apk를 눌러 받아 설치하세요." \
             --target ${{ github.sha }}
 
+      # 화면 캡처 테스트 — 실패해도 APK 배포에는 영향 없음
+      - name: Screenshot tests
+        if: always()
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          gradle recordPaparazziDebug --no-daemon 2>&1 | tee shots.log
+
       # 빌드 결과(성공/실패)를 build-log 브랜치에 남겨서 채팅에서도 확인할 수 있게 한다
       - name: Save build log
         if: always()
         run: |
           echo "run=${{ github.run_number }} sha=${{ github.sha }} status=${{ job.status }}" > build-status.txt
-          mkdir -p /tmp/log && cp build.log build-status.txt /tmp/log/ 2>/dev/null || true
+          mkdir -p /tmp/log/shots && cp build.log build-status.txt shots.log /tmp/log/ 2>/dev/null || true
+          cp app/src/test/snapshots/images/*.png /tmp/log/shots/ 2>/dev/null || true
           git config user.name "build-bot"
           git config user.email "build-bot@users.noreply.github.com"
           git checkout --orphan build-log
           git rm -rf --cached . > /dev/null
           rm -rf ./* .github .gitignore
-          cp /tmp/log/* .
+          cp -r /tmp/log/* .
           git add build.log build-status.txt
+          git add shots.log shots 2>/dev/null || true
           git commit -m "build #${{ github.run_number }}: ${{ job.status }}"
           git push -f origin build-log
