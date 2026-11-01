@@ -218,31 +218,31 @@ private fun variableFamily(res: Int): FontFamily = FontFamily(
 
 /**
  * 성경 본문 글꼴 목록. 저장값은 이 순서의 번호라서 앞쪽 4개 순서는 바꾸지 않는다.
+ * 글꼴마다 실제 파일의 굵기값으로 한 번씩만 등록 (같은 파일을 두 번 등록하면 굵기가 안 먹음).
  * 굵기 파일이 2개뿐인 글꼴(고운바탕)은 '굵게'와 '더 굵게'가 같다.
  */
 internal val ReaderFonts: List<Pair<String, FontFamily>> = listOf(
     "기본" to FontFamily.Default,
     "나눔고딕" to FontFamily(
         Font(R.font.nanum_gothic, FontWeight.Normal),
-        Font(R.font.nanum_gothic_bold, FontWeight.SemiBold),
+        Font(R.font.nanum_gothic_bold, FontWeight.Bold),
         Font(R.font.nanum_gothic_extrabold, FontWeight.ExtraBold),
     ),
     "나눔명조" to FontFamily(
         Font(R.font.nanum_myeongjo, FontWeight.Normal),
-        Font(R.font.nanum_myeongjo_bold, FontWeight.SemiBold),
+        Font(R.font.nanum_myeongjo_bold, FontWeight.Bold),
         Font(R.font.nanum_myeongjo_extrabold, FontWeight.ExtraBold),
     ),
     "고운바탕" to FontFamily(
         Font(R.font.gowun_batang, FontWeight.Normal),
-        Font(R.font.gowun_batang_bold, FontWeight.SemiBold),
-        Font(R.font.gowun_batang_bold, FontWeight.ExtraBold),
+        Font(R.font.gowun_batang_bold, FontWeight.Bold),
     ),
     "프리텐다드" to variableFamily(R.font.pretendard),
     "본고딕" to variableFamily(R.font.noto_sans_kr),
     "IBM 플렉스" to FontFamily(
         Font(R.font.ibm_plex_regular, FontWeight.Normal),
         Font(R.font.ibm_plex_semibold, FontWeight.SemiBold),
-        Font(R.font.ibm_plex_bold, FontWeight.ExtraBold),
+        Font(R.font.ibm_plex_bold, FontWeight.Bold),
     ),
     "고딕 A1" to FontFamily(
         Font(R.font.gothic_a1_regular, FontWeight.Normal),
