@@ -230,6 +230,8 @@ internal data class ReaderStyle(
     val sideMargin: Float,
     val numInline: Boolean,
     val numScale: Float,
+    val header: Boolean,
+    val headerSize: Float,
 ) {
     val fontFamily: FontFamily get() = ReaderFonts.getOrNull(family)?.second ?: FontFamily.Default
     val weight: FontWeight get() = if (bold) FontWeight.Bold else FontWeight.Normal
@@ -243,13 +245,16 @@ internal data class ReaderStyle(
         prefs.sideMargin = sideMargin
         prefs.verseNumInline = numInline
         prefs.verseNumScale = numScale
+        prefs.fullscreenHeader = header
+        prefs.fullscreenHeaderSize = headerSize
     }
 
     companion object {
-        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f, true, 0.6f)
+        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f, true, 0.6f, true, 11f)
         fun load(prefs: Prefs) = ReaderStyle(
             prefs.fontSize, prefs.fontFamily, prefs.fontBold, prefs.lineSpacing, prefs.verseGap, prefs.sideMargin,
             prefs.verseNumInline, prefs.verseNumScale,
+            prefs.fullscreenHeader, prefs.fullscreenHeaderSize,
         )
     }
 }
@@ -327,6 +332,19 @@ private fun BibleReaderLoaded(
 
     Scaffold(
         topBar = {
+            if (fullscreen && style.header) {
+                Text(
+                    "${curBook.name} ${curChapter}장",
+                    fontSize = style.headerSize.sp,
+                    fontWeight = FontWeight.Light,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp, bottom = 2.dp),
+                )
+            }
             if (!fullscreen) BackTopBar(
                 title = "${curBook.name} ${curChapter}장",
                 onBack = onBack,
@@ -489,6 +507,18 @@ internal fun StylePanel(
         }
         SliderRow("좌우 여백", "${style.sideMargin.toInt()}", style.sideMargin, 4f..48f, 10) {
             onChange(style.copy(sideMargin = it))
+        }
+
+        PanelLabel("전체화면 위치 표시 (화면 가운데 누르면 전체화면)")
+        Row {
+            ChoiceChip("켜기", selected = style.header) { onChange(style.copy(header = true)) }
+            Spacer(Modifier.width(8.dp))
+            ChoiceChip("끄기", selected = !style.header) { onChange(style.copy(header = false)) }
+        }
+        if (style.header) {
+            SliderRow("표시 크기", "${style.headerSize.toInt()}", style.headerSize, 8f..18f, 9) {
+                onChange(style.copy(headerSize = it))
+            }
         }
     }
 }

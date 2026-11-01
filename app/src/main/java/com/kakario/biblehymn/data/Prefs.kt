@@ -80,6 +80,15 @@ class Prefs(context: Context) {
         get() = sp.getFloat("verseNumScale", 0.6f)
         set(v) = sp.edit().putFloat("verseNumScale", v).apply()
 
+    /** 전체화면일 때 위쪽에 작게 '창세기 1장' 표시 */
+    var fullscreenHeader: Boolean
+        get() = sp.getBoolean("fullscreenHeader", true)
+        set(v) = sp.edit().putBoolean("fullscreenHeader", v).apply()
+
+    var fullscreenHeaderSize: Float
+        get() = sp.getFloat("fullscreenHeaderSize", 11f)
+        set(v) = sp.edit().putFloat("fullscreenHeaderSize", v).apply()
+
     /** 화면 왼쪽/오른쪽을 터치하면 이전/다음으로 넘기기 */
     var tapPaging: Boolean
         get() = sp.getBoolean("tapPaging", false)
