@@ -516,8 +516,10 @@ internal fun StylePanel(
     onReset: () -> Unit,
     onClose: () -> Unit,
     initialSection: String? = null,
-    /** 찬송 가사 화면용: 절 번호·전체화면 항목은 숨김 */
+    /** 찬송 가사 화면용: 절 번호 항목은 숨김 */
     forLyrics: Boolean = false,
+    /** 찬송 악보 화면용: 전체화면 위치 표시만 */
+    forScore: Boolean = false,
 ) {
     var section by remember { mutableStateOf(initialSection) }
     Column(
@@ -529,7 +531,7 @@ internal fun StylePanel(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (section == null) {
-                Text(if (forLyrics) "가사 글꼴 설정" else "글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                Text(if (forScore) "화면 설정" else if (forLyrics) "가사 글꼴 설정" else "글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 TextButton(onClick = onReset) { Text("기본값") }
             } else {
                 Text(
@@ -548,16 +550,16 @@ internal fun StylePanel(
         when (section) {
             null -> {
                 val fontName = ReaderFonts.getOrNull(style.family)?.first ?: "기본"
-                PanelCategory("글꼴", "$fontName · ${WeightLabels.getOrElse(style.weightLevel) { "" }}") { section = "글꼴" }
-                PanelCategory(
+                if (!forScore) PanelCategory("글꼴", "$fontName · ${WeightLabels.getOrElse(style.weightLevel) { "" }}") { section = "글꼴" }
+                if (!forScore) PanelCategory(
                     "크기와 간격",
                     "글자 ${style.size.toInt()} · 줄 ${String.format(Locale.US, "%.1f", style.lineSpacing)} · 절 ${style.verseGap.toInt()} · 여백 ${style.sideMargin.toInt()}",
                 ) { section = "크기와 간격" }
-                if (!forLyrics) PanelCategory(
+                if (!forLyrics && !forScore) PanelCategory(
                     "절 번호",
                     "${if (style.numInline) "글 앞에 작게" else "왼쪽 칸"} · ${(style.numScale * 100).roundToInt()}%",
                 ) { section = "절 번호" }
-                if (!forLyrics) PanelCategory(
+                PanelCategory(
                     "전체화면 위치 표시",
                     if (style.header) "켜짐 · ${HeaderPosLabels.getOrElse(style.headerPos) { "" }} · 크기 ${style.headerSize.toInt()}" else "꺼짐",
                 ) { section = "전체화면 위치 표시" }
@@ -615,7 +617,7 @@ internal fun StylePanel(
 
             "전체화면 위치 표시" -> {
                 Text(
-                    "성경 화면 가운데를 누르면 전체화면이 되고, 지금 위치(예: 창세기 1장)를 작게 보여줘요",
+                    "화면 가운데를 누르면 전체화면이 되고, 지금 위치(예: 창세기 1장, 405장 제목)를 작게 보여줘요",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
@@ -960,7 +962,7 @@ private fun MarkRow(
 
 /** 전체화면: 상단 상태바·하단 버튼줄 숨기기 (가장자리에서 밀면 잠깐 보임) */
 @Composable
-private fun FullscreenEffect(on: Boolean) {
+internal fun FullscreenEffect(on: Boolean) {
     val activity = LocalContext.current as? Activity ?: return
     DisposableEffect(on) {
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)

@@ -1,6 +1,7 @@
 package com.kakario.biblehymn.ui
 
 import android.widget.Toast
+import androidx.compose.runtime.key
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -285,13 +286,17 @@ fun HymnViewerScreen(
         lyricStyle = st
         st.save(prefs)
     }
-    val onTapSide: ((Int) -> Unit)? = if (tapPaging) {
-        { dir ->
-            val target = pager.currentPage + dir
-            if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
+    var fullscreen by remember { mutableStateOf(false) }
+    FullscreenEffect(fullscreen)
+    // 왼쪽/오른쪽 = 넘기기(설정 켰을 때), 가운데 = 전체화면
+    val onTapRegion: (Int) -> Unit = { region ->
+        when {
+            region == 0 -> fullscreen = !fullscreen
+            tapPaging -> {
+                val target = pager.currentPage + region
+                if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
+            }
         }
-    } else {
-        null
     }
 
     val current = hymns?.getOrNull(pager.currentPage)
@@ -302,30 +307,32 @@ fun HymnViewerScreen(
 
     Scaffold(
         topBar = {
-            BackTopBar(
+            if (!fullscreen) BackTopBar(
                 title = if (current == null) "" else "${current.number}장  ${current.title}",
                 onBack = onBack,
                 actions = {
-                    if (showLyrics) FontButton(selected = showStyle) { showStyle = !showStyle }
+                    FontButton(selected = showStyle) { showStyle = !showStyle }
                     ScoreLyricsToggle(showLyrics) {
                         showLyrics = it
                         prefs.hymnShowLyrics = it
-                        if (!it) showStyle = false
                     }
                 },
             )
         },
         bottomBar = {
-            Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
+            if (!fullscreen) Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
                 HorizontalDivider()
-                if (showStyle && showLyrics) {
-                    StylePanel(
-                        style = lyricStyle,
-                        onChange = ::updateStyle,
-                        onReset = { updateStyle(ReaderStyle.Default) },
-                        onClose = { showStyle = false },
-                        forLyrics = true,
-                    )
+                if (showStyle) {
+                    key(showLyrics) {
+                        StylePanel(
+                            style = lyricStyle,
+                            onChange = ::updateStyle,
+                            onReset = { updateStyle(ReaderStyle.Default) },
+                            onClose = { showStyle = false },
+                            forLyrics = showLyrics,
+                            forScore = !showLyrics,
+                        )
+                    }
                 } else Row(
                     Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -353,24 +360,58 @@ fun HymnViewerScreen(
         if (hymns == null) {
             Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else {
-            HorizontalPager(
-                state = pager,
-                modifier = Modifier.padding(pad).fillMaxSize(),
-                beyondViewportPageCount = 1,
-                key = { hymns[it].number },
-            ) { page ->
-                val h = hymns[page]
-                if (showLyrics) {
-                    LyricsPage(book, h, lyricStyle, onTapSide)
-                } else if (h.hasScore) {
-                    ZoomableScore(h.pages, fitScreen = fitScore, onTapSide = onTapSide)
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "${h.number}장은 악보 파일이 없어요",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            val showHeader = fullscreen && lyricStyle.header
+            val headerTop = lyricStyle.headerPos < 3
+            val headerSpace = (lyricStyle.headerSize * 1.6f + 10f).dp
+            Box(Modifier.padding(pad).fillMaxSize()) {
+                HorizontalPager(
+                    state = pager,
+                    modifier = Modifier
+                        .padding(
+                            top = if (showHeader && headerTop) headerSpace else 0.dp,
+                            bottom = if (showHeader && !headerTop) headerSpace else 0.dp,
                         )
+                        .fillMaxSize(),
+                    beyondViewportPageCount = 1,
+                    key = { hymns[it].number },
+                ) { page ->
+                    val h = hymns[page]
+                    if (showLyrics) {
+                        LyricsPage(book, h, lyricStyle, onTapRegion)
+                    } else if (h.hasScore) {
+                        ZoomableScore(h.pages, fitScreen = fitScore, onTapRegion = onTapRegion)
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onTapRegion(0) } },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "${h.number}장은 악보 파일이 없어요",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
+                }
+                if (showHeader && current != null) {
+                    val align = when (lyricStyle.headerPos) {
+                        0 -> Alignment.TopStart
+                        2 -> Alignment.TopEnd
+                        3 -> Alignment.BottomStart
+                        4 -> Alignment.BottomCenter
+                        5 -> Alignment.BottomEnd
+                        else -> Alignment.TopCenter
+                    }
+                    Text(
+                        "${current.number}장  ${current.title}",
+                        fontSize = lyricStyle.headerSize.sp,
+                        fontWeight = FontWeight.Light,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .align(align)
+                            .padding(horizontal = 14.dp, vertical = 5.dp),
+                    )
                 }
             }
         }
@@ -407,17 +448,18 @@ private fun ScoreLyricsToggle(showLyrics: Boolean, onChange: (Boolean) -> Unit) 
 
 /** 가사 보기: 1절, 2절 … 순서대로 (후렴은 절마다 이어서) */
 @Composable
-internal fun LyricsPage(book: SongBook, h: Hymn, style: ReaderStyle, onTapSide: ((Int) -> Unit)?) {
+internal fun LyricsPage(book: SongBook, h: Hymn, style: ReaderStyle, onTapRegion: ((Int) -> Unit)?) {
     val context = LocalContext.current
     val lyrics by produceState<Lyrics?>(null, book, h.number) {
         value = withContext(Dispatchers.IO) { LyricsStore.get(context, book, h.number) }
     }
-    val tapModifier = if (onTapSide != null) {
+    val tapModifier = if (onTapRegion != null) {
         Modifier.pointerInput(Unit) {
             detectTapGestures(onTap = { o ->
                 when {
-                    o.x < size.width * 0.3f -> onTapSide(-1)
-                    o.x > size.width * 0.7f -> onTapSide(1)
+                    o.x < size.width * 0.3f -> onTapRegion(-1)
+                    o.x > size.width * 0.7f -> onTapRegion(1)
+                    else -> onTapRegion(0)
                 }
             })
         }

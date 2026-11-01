@@ -55,8 +55,8 @@ fun ZoomableScore(
     pages: List<String>,
     fitScreen: Boolean,
     modifier: Modifier = Modifier,
-    /** 좌우 터치 넘기기: -1 = 왼쪽, +1 = 오른쪽 (null이면 사용 안 함) */
-    onTapSide: ((Int) -> Unit)? = null,
+    /** 한 번 터치: -1 = 왼쪽, 0 = 가운데, +1 = 오른쪽 (확대 안 했을 때만) */
+    onTapRegion: ((Int) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val bitmaps by produceState(initialValue = pages.map { ScoreImages.cached(it) }, pages) {
@@ -108,14 +108,15 @@ fun ZoomableScore(
                     } while (event.changes.any { it.pressed })
                 }
             }
-            .pointerInput(onTapSide != null) {
+            .pointerInput(onTapRegion != null) {
                 detectTapGestures(
                     onTap = { tap ->
-                        val cb = onTapSide
+                        val cb = onTapRegion
                         if (cb != null && scale <= 1.01f) {
                             when {
                                 tap.x < size.width * 0.3f -> cb(-1)
                                 tap.x > size.width * 0.7f -> cb(1)
+                                else -> cb(0)
                             }
                         }
                     },
