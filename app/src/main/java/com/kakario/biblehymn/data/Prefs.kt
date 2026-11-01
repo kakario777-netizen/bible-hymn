@@ -113,6 +113,11 @@ class Prefs(context: Context) {
         else sp.edit().putInt("lastSong_${book.name}", number).apply()
     }
 
+    /** 찬송 화면에서 악보 대신 가사로 보기 */
+    var hymnShowLyrics: Boolean
+        get() = sp.getBoolean("hymnShowLyrics", false)
+        set(v) = sp.edit().putBoolean("hymnShowLyrics", v).apply()
+
     /** 큰 악보를 한 화면에 맞춰 축소 */
     var fitScore: Boolean
         get() = sp.getBoolean("fitScore", false)

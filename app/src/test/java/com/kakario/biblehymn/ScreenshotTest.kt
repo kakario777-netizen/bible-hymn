@@ -16,7 +16,9 @@ import app.cash.paparazzi.Paparazzi
 import com.kakario.biblehymn.data.Prefs
 import com.kakario.biblehymn.data.Verse
 import com.kakario.biblehymn.R
+import com.kakario.biblehymn.data.Lyrics
 import com.kakario.biblehymn.ui.AppTheme
+import com.kakario.biblehymn.ui.LyricsContent
 import com.kakario.biblehymn.ui.BackTopBar
 import com.kakario.biblehymn.ui.FontButton
 import com.kakario.biblehymn.ui.IconLabelButton
@@ -130,6 +132,26 @@ class ScreenshotTest {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    @Test
+    fun lyrics() {
+        val l = Lyrics(
+            number = 5,
+            title = "가사 화면 예시",
+            verses = listOf(
+                "첫째 절 예시 문장입니다 화면에 이렇게 이어서 보여요 길게 써서 줄바꿈도 확인합니다",
+                "둘째 절 예시 문장입니다 화면에 이렇게 이어서 보여요",
+                "셋째 절 예시 문장입니다",
+            ),
+            refrain = "후렴 예시 문장입니다 절마다 이어서 보여요",
+            amen = true,
+        )
+        paparazzi.snapshot {
+            AppTheme(dark = false) {
+                Surface { LyricsContent(l, ReaderStyle.Default) }
             }
         }
     }

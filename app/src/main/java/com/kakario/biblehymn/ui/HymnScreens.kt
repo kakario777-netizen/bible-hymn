@@ -1,6 +1,10 @@
 package com.kakario.biblehymn.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import com.kakario.biblehymn.data.Lyrics
+import com.kakario.biblehymn.data.LyricsStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -259,6 +263,16 @@ fun HymnViewerScreen(
     val fitScore = remember { prefs.fitScore }
     val tapPaging = remember { prefs.tapPaging }
     KeepScreenOn(remember { prefs.screenTimeout })
+    var showLyrics by remember { mutableStateOf(prefs.hymnShowLyrics) }
+    val lyricStyle = remember { ReaderStyle.load(prefs) }
+    val onTapSide: ((Int) -> Unit)? = if (tapPaging) {
+        { dir ->
+            val target = pager.currentPage + dir
+            if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
+        }
+    } else {
+        null
+    }
 
     val current = hymns?.getOrNull(pager.currentPage)
 
@@ -271,6 +285,12 @@ fun HymnViewerScreen(
             BackTopBar(
                 title = if (current == null) "" else "${current.number}장  ${current.title}",
                 onBack = onBack,
+                actions = {
+                    ScoreLyricsToggle(showLyrics) {
+                        showLyrics = it
+                        prefs.hymnShowLyrics = it
+                    }
+                },
             )
         },
         bottomBar = {
@@ -310,19 +330,10 @@ fun HymnViewerScreen(
                 key = { hymns[it].number },
             ) { page ->
                 val h = hymns[page]
-                if (h.hasScore) {
-                    ZoomableScore(
-                        h.pages,
-                        fitScreen = fitScore,
-                        onTapSide = if (tapPaging) {
-                            { dir ->
-                                val target = pager.currentPage + dir
-                                if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
-                            }
-                        } else {
-                            null
-                        },
-                    )
+                if (showLyrics) {
+                    LyricsPage(book, h, lyricStyle, onTapSide)
+                } else if (h.hasScore) {
+                    ZoomableScore(h.pages, fitScreen = fitScore, onTapSide = onTapSide)
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -331,6 +342,141 @@ fun HymnViewerScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** 상단바 [악보 | 가사] 전환 */
+@Composable
+private fun ScoreLyricsToggle(showLyrics: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .padding(end = 8.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(50))
+            .padding(3.dp),
+    ) {
+        listOf(false to "악보", true to "가사").forEach { (value, label) ->
+            val selected = showLyrics == value
+            Text(
+                label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(50),
+                    )
+                    .clickable { onChange(value) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+            )
+        }
+    }
+}
+
+/** 가사 보기: 1절, 2절 … 순서대로 (후렴은 절마다 이어서) */
+@Composable
+internal fun LyricsPage(book: SongBook, h: Hymn, style: ReaderStyle, onTapSide: ((Int) -> Unit)?) {
+    val context = LocalContext.current
+    val lyrics by produceState<Lyrics?>(null, book, h.number) {
+        value = withContext(Dispatchers.IO) { LyricsStore.get(context, book, h.number) }
+    }
+    val tapModifier = if (onTapSide != null) {
+        Modifier.pointerInput(Unit) {
+            detectTapGestures(onTap = { o ->
+                when {
+                    o.x < size.width * 0.3f -> onTapSide(-1)
+                    o.x > size.width * 0.7f -> onTapSide(1)
+                }
+            })
+        }
+    } else {
+        Modifier
+    }
+    val l = lyrics
+    if (l == null) {
+        Box(Modifier.fillMaxSize().then(tapModifier), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("${h.number}장 ${h.title}", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                Text(
+                    "가사 준비중",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+        return
+    }
+    LyricsContent(l, style, Modifier.fillMaxSize().then(tapModifier))
+}
+
+@Composable
+internal fun LyricsContent(l: Lyrics, style: ReaderStyle, modifier: Modifier = Modifier) {
+    val lh = (style.size * style.lineSpacing).sp
+    val multi = l.verses.size > 1
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(start = style.sideMargin.dp, end = style.sideMargin.dp, top = 16.dp, bottom = 48.dp),
+    ) {
+        item {
+            Text(
+                "${l.number}장  ${l.title}",
+                fontSize = (style.size + 3).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = style.fontFamily,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+        }
+        l.verses.forEachIndexed { i, verse ->
+            item {
+                Column(Modifier.padding(bottom = (style.verseGap + 10f).dp)) {
+                    if (multi) {
+                        Text(
+                            "${i + 1}절",
+                            fontSize = (style.size * 0.7f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Text(
+                        verse,
+                        fontSize = style.size.sp,
+                        lineHeight = lh,
+                        fontFamily = style.fontFamily,
+                        fontWeight = style.weight,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    if (l.refrain.isNotBlank()) {
+                        Text(
+                            "후렴",
+                            fontSize = (style.size * 0.7f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        Text(
+                            l.refrain,
+                            fontSize = style.size.sp,
+                            lineHeight = lh,
+                            fontFamily = style.fontFamily,
+                            fontWeight = style.weight,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        if (l.amen) {
+            item {
+                Text(
+                    "아멘",
+                    fontSize = style.size.sp,
+                    fontFamily = style.fontFamily,
+                    fontWeight = style.weight,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
             }
         }
     }

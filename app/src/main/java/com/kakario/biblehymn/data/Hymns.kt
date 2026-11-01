@@ -58,6 +58,40 @@ object Hymns {
     }
 }
 
+/** 찬송 가사 (assets/<dir>/lyrics/NNN.json) */
+data class Lyrics(
+    val number: Int,
+    val title: String,
+    val verses: List<String>,
+    val refrain: String,
+    val amen: Boolean,
+)
+
+object LyricsStore {
+    private val cache = HashMap<String, Lyrics?>()
+
+    /** 가사가 아직 없으면 null → '가사 준비중' */
+    fun get(context: Context, book: SongBook, number: Int): Lyrics? {
+        val path = "${book.dir}/lyrics/%03d.json".format(number)
+        synchronized(cache) { if (cache.containsKey(path)) return cache[path] }
+        val result = try {
+            val o = org.json.JSONObject(context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() })
+            val arr = o.getJSONArray("verses")
+            Lyrics(
+                number = o.optInt("number", number),
+                title = o.optString("title", ""),
+                verses = (0 until arr.length()).map { arr.getString(it) },
+                refrain = o.optString("refrain", ""),
+                amen = o.optBoolean("amen", false),
+            )
+        } catch (e: Exception) {
+            null
+        }
+        synchronized(cache) { cache[path] = result }
+        return result
+    }
+}
+
 /** 악보 이미지 로더 (최근 이미지는 메모리에 보관) */
 object ScoreImages {
     private val cache = object : LruCache<String, ImageBitmap>(64 * 1024 * 1024) {
