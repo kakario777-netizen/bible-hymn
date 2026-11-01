@@ -1,6 +1,15 @@
 package com.kakario.biblehymn.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.derivedStateOf
+import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import com.kakario.biblehymn.data.Lyrics
@@ -154,17 +163,23 @@ fun HymnListScreen(
                     Text("찾는 찬송가가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                ) {
-                    items(filtered, key = { it.number }) { h ->
-                        HymnRow(h, highlighted = h.number == prefs.lastSong(book)) { onHymn(h.number) }
-                        HorizontalDivider(
-                            Modifier.padding(start = 76.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                        )
+                val showScroller = filtered.size > 30
+                Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().padding(end = if (showScroller) 40.dp else 0.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                    ) {
+                        items(filtered, key = { it.number }) { h ->
+                            HymnRow(h, highlighted = h.number == prefs.lastSong(book)) { onHymn(h.number) }
+                            HorizontalDivider(
+                                Modifier.padding(start = 76.dp),
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                            )
+                        }
+                    }
+                    if (showScroller) {
+                        FastScroller(listState, filtered, Modifier.align(Alignment.CenterEnd))
                     }
                 }
             }
@@ -264,7 +279,12 @@ fun HymnViewerScreen(
     val tapPaging = remember { prefs.tapPaging }
     KeepScreenOn(remember { prefs.screenTimeout })
     var showLyrics by remember { mutableStateOf(prefs.hymnShowLyrics) }
-    val lyricStyle = remember { ReaderStyle.load(prefs) }
+    var lyricStyle by remember { mutableStateOf(ReaderStyle.load(prefs)) }
+    var showStyle by remember { mutableStateOf(false) }
+    fun updateStyle(st: ReaderStyle) {
+        lyricStyle = st
+        st.save(prefs)
+    }
     val onTapSide: ((Int) -> Unit)? = if (tapPaging) {
         { dir ->
             val target = pager.currentPage + dir
@@ -286,9 +306,11 @@ fun HymnViewerScreen(
                 title = if (current == null) "" else "${current.number}장  ${current.title}",
                 onBack = onBack,
                 actions = {
+                    if (showLyrics) FontButton(selected = showStyle) { showStyle = !showStyle }
                     ScoreLyricsToggle(showLyrics) {
                         showLyrics = it
                         prefs.hymnShowLyrics = it
+                        if (!it) showStyle = false
                     }
                 },
             )
@@ -296,7 +318,15 @@ fun HymnViewerScreen(
         bottomBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
                 HorizontalDivider()
-                Row(
+                if (showStyle && showLyrics) {
+                    StylePanel(
+                        style = lyricStyle,
+                        onChange = ::updateStyle,
+                        onReset = { updateStyle(ReaderStyle.Default) },
+                        onClose = { showStyle = false },
+                        forLyrics = true,
+                    )
+                } else Row(
                     Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -477,6 +507,101 @@ internal fun LyricsContent(l: Lyrics, style: ReaderStyle, modifier: Modifier = M
                     fontWeight = style.weight,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 목록 오른쪽 빠른 스크롤바: 1·100·200… 표시, 누르거나 끌면 그 위치로 바로 이동.
+ * 끄는 동안 지금 몇 장인지 옆에 크게 보여준다.
+ */
+@Composable
+internal fun FastScroller(listState: LazyListState, items: List<Hymn>, modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    var dragging by remember { mutableStateOf(false) }
+    val count = items.size
+    val primary = MaterialTheme.colorScheme.primary
+    BoxWithConstraints(
+        modifier
+            .fillMaxHeight()
+            .width(40.dp)
+            .padding(vertical = 10.dp),
+    ) {
+        val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        val boxH = maxHeight
+        val thumbH = 36.dp
+        fun jump(y: Float) {
+            val idx = ((y / hPx).coerceIn(0f, 1f) * (count - 1)).roundToInt()
+            scope.launch { listState.scrollToItem(idx) }
+        }
+        val frac by remember(count) {
+            derivedStateOf {
+                val visible = listState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
+                val max = (count - visible).coerceAtLeast(1)
+                (listState.firstVisibleItemIndex.toFloat() / max).coerceIn(0f, 1f)
+            }
+        }
+        // 트랙
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 6.dp)
+                .width(3.dp)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(2.dp)),
+        )
+        // 100 단위 표시
+        val marks = items.indices.filter { items[it].number == 1 || items[it].number % 100 == 0 || it == count - 1 }
+        marks.forEach { idx ->
+            val f = idx.toFloat() / (count - 1).coerceAtLeast(1)
+            Text(
+                "${items[idx].number}",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = (boxH - 12.dp) * f)
+                    .padding(end = 13.dp),
+            )
+        }
+        // 손잡이
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .offset(y = (boxH - thumbH) * frac)
+                .padding(end = 4.dp)
+                .width(7.dp)
+                .height(thumbH)
+                .background(primary.copy(alpha = if (dragging) 1f else 0.7f), RoundedCornerShape(4.dp)),
+        )
+        // 터치 영역
+        Box(
+            Modifier
+                .matchParentSize()
+                .pointerInput(count) { detectTapGestures { jump(it.y) } }
+                .pointerInput(count) {
+                    detectVerticalDragGestures(
+                        onDragStart = { dragging = true; jump(it.y) },
+                        onDragEnd = { dragging = false },
+                        onDragCancel = { dragging = false },
+                    ) { change, _ -> jump(change.position.y) }
+                },
+        )
+    }
+    // 끄는 중 현재 번호 말풍선
+    if (dragging) {
+        val n = items.getOrNull(listState.firstVisibleItemIndex)?.number
+        if (n != null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Text("${n}장", fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+                }
             }
         }
     }

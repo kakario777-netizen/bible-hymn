@@ -516,6 +516,8 @@ internal fun StylePanel(
     onReset: () -> Unit,
     onClose: () -> Unit,
     initialSection: String? = null,
+    /** 찬송 가사 화면용: 절 번호·전체화면 항목은 숨김 */
+    forLyrics: Boolean = false,
 ) {
     var section by remember { mutableStateOf(initialSection) }
     Column(
@@ -527,7 +529,7 @@ internal fun StylePanel(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (section == null) {
-                Text("글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                Text(if (forLyrics) "가사 글꼴 설정" else "글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 TextButton(onClick = onReset) { Text("기본값") }
             } else {
                 Text(
@@ -551,11 +553,11 @@ internal fun StylePanel(
                     "크기와 간격",
                     "글자 ${style.size.toInt()} · 줄 ${String.format(Locale.US, "%.1f", style.lineSpacing)} · 절 ${style.verseGap.toInt()} · 여백 ${style.sideMargin.toInt()}",
                 ) { section = "크기와 간격" }
-                PanelCategory(
+                if (!forLyrics) PanelCategory(
                     "절 번호",
                     "${if (style.numInline) "글 앞에 작게" else "왼쪽 칸"} · ${(style.numScale * 100).roundToInt()}%",
                 ) { section = "절 번호" }
-                PanelCategory(
+                if (!forLyrics) PanelCategory(
                     "전체화면 위치 표시",
                     if (style.header) "켜짐 · ${HeaderPosLabels.getOrElse(style.headerPos) { "" }} · 크기 ${style.headerSize.toInt()}" else "꺼짐",
                 ) { section = "전체화면 위치 표시" }

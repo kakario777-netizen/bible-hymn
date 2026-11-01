@@ -17,7 +17,15 @@ import com.kakario.biblehymn.data.Prefs
 import com.kakario.biblehymn.data.Verse
 import com.kakario.biblehymn.R
 import com.kakario.biblehymn.data.Lyrics
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.Alignment
+import com.kakario.biblehymn.data.Hymn
 import com.kakario.biblehymn.ui.AppTheme
+import com.kakario.biblehymn.ui.FastScroller
 import com.kakario.biblehymn.ui.LyricsContent
 import com.kakario.biblehymn.ui.BackTopBar
 import com.kakario.biblehymn.ui.FontButton
@@ -152,6 +160,24 @@ class ScreenshotTest {
         paparazzi.snapshot {
             AppTheme(dark = false) {
                 Surface { LyricsContent(l, ReaderStyle.Default) }
+            }
+        }
+    }
+
+    @Test
+    fun hymnListScroller() {
+        val items = (1..558).map { Hymn(it, "찬송가 제목 예시 $it", emptyList()) }
+        paparazzi.snapshot {
+            AppTheme(dark = false) {
+                Surface {
+                    val state = rememberLazyListState(initialFirstVisibleItemIndex = 250)
+                    Box(Modifier.fillMaxSize()) {
+                        LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(end = 40.dp)) {
+                            items(items) { h -> Text("${h.number}   ${h.title}", fontSize = 17.sp, modifier = Modifier.padding(16.dp)) }
+                        }
+                        FastScroller(state, items, Modifier.align(Alignment.CenterEnd))
+                    }
+                }
             }
         }
     }
