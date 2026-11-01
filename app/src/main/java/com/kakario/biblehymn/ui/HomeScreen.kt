@@ -493,26 +493,26 @@ private fun NoteCluster(color: Color) {
     Box(Modifier.size(width = 92.dp, height = 84.dp)) {
         Text(
             "♫",
-            fontSize = 50.sp,
-            color = color.copy(alpha = 0.34f),
+            fontSize = 52.sp,
+            color = color.copy(alpha = 0.40f),
             modifier = Modifier.align(Alignment.Center).offset(x = 6.dp, y = 4.dp),
         )
         Text(
             "♪",
-            fontSize = 28.sp,
-            color = color.copy(alpha = 0.26f),
+            fontSize = 30.sp,
+            color = color.copy(alpha = 0.32f),
             modifier = Modifier.align(Alignment.TopStart).offset(x = 2.dp, y = 0.dp).rotate(-14f),
         )
         Text(
             "♬",
-            fontSize = 22.sp,
-            color = color.copy(alpha = 0.22f),
+            fontSize = 25.sp,
+            color = color.copy(alpha = 0.30f),
             modifier = Modifier.align(Alignment.BottomEnd).offset(x = 0.dp, y = (-2).dp).rotate(10f),
         )
         Text(
             "♩",
-            fontSize = 18.sp,
-            color = color.copy(alpha = 0.18f),
+            fontSize = 21.sp,
+            color = color.copy(alpha = 0.26f),
             modifier = Modifier.align(Alignment.BottomStart).offset(x = 10.dp, y = (-6).dp).rotate(-6f),
         )
     }
