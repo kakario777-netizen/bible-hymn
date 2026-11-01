@@ -110,4 +110,27 @@ class ScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun verseNumbers() {
+        val v2 = Verse(17, "하나님이 그 아들을 세상에 보내신 것은 세상을 심판하려 하심이 아니요 저로 말미암아 세상이 구원을 받게 하려 하심이라")
+        paparazzi.snapshot {
+            AppTheme(dark = false) {
+                Surface {
+                    Column(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
+                        listOf(
+                            "글 앞에 작게 (기본)" to ReaderStyle.Default,
+                            "글 앞에 작게 · 번호 100%" to ReaderStyle.Default.copy(numScale = 1.0f),
+                            "왼쪽 칸" to ReaderStyle.Default.copy(numInline = false),
+                            "글자 크기 30" to ReaderStyle.Default.copy(size = 30f),
+                        ).forEach { (label, st) ->
+                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            VerseRow(sample, st)
+                            VerseRow(v2, st)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -1,7 +1,17 @@
 package com.kakario.biblehymn.ui
 
 import androidx.compose.foundation.background
+import android.app.Activity
 import android.widget.Toast
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Spacer
@@ -218,6 +228,8 @@ internal data class ReaderStyle(
     val lineSpacing: Float,
     val verseGap: Float,
     val sideMargin: Float,
+    val numInline: Boolean,
+    val numScale: Float,
 ) {
     val fontFamily: FontFamily get() = ReaderFonts.getOrNull(family)?.second ?: FontFamily.Default
     val weight: FontWeight get() = if (bold) FontWeight.Bold else FontWeight.Normal
@@ -229,12 +241,15 @@ internal data class ReaderStyle(
         prefs.lineSpacing = lineSpacing
         prefs.verseGap = verseGap
         prefs.sideMargin = sideMargin
+        prefs.verseNumInline = numInline
+        prefs.verseNumScale = numScale
     }
 
     companion object {
-        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f)
+        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f, true, 0.6f)
         fun load(prefs: Prefs) = ReaderStyle(
             prefs.fontSize, prefs.fontFamily, prefs.fontBold, prefs.lineSpacing, prefs.verseGap, prefs.sideMargin,
+            prefs.verseNumInline, prefs.verseNumScale,
         )
     }
 }
@@ -292,6 +307,8 @@ private fun BibleReaderLoaded(
         s.save(prefs)
     }
     var showStyle by remember { mutableStateOf(false) }
+    var fullscreen by remember { mutableStateOf(false) }
+    FullscreenEffect(fullscreen)
     var showBookmarkDialog by remember { mutableStateOf(false) }
     val tapPaging = remember { prefs.tapPaging }
     KeepScreenOn(remember { prefs.screenTimeout })
@@ -310,7 +327,7 @@ private fun BibleReaderLoaded(
 
     Scaffold(
         topBar = {
-            BackTopBar(
+            if (!fullscreen) BackTopBar(
                 title = "${curBook.name} ${curChapter}장",
                 onBack = onBack,
                 actions = {
@@ -325,7 +342,7 @@ private fun BibleReaderLoaded(
             )
         },
         bottomBar = {
-            Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
+            if (!fullscreen) Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
                 HorizontalDivider()
                 if (showStyle) {
                     StylePanel(
@@ -365,14 +382,13 @@ private fun BibleReaderLoaded(
                 .padding(pad)
                 .fillMaxSize()
                 .pointerInput(tapPaging) {
-                    if (tapPaging) {
-                        detectTapGestures(onTap = { o ->
-                            when {
-                                o.x < size.width * 0.3f -> goPage(pager.currentPage - 1)
-                                o.x > size.width * 0.7f -> goPage(pager.currentPage + 1)
-                            }
-                        })
-                    }
+                    detectTapGestures(onTap = { o ->
+                        when {
+                            tapPaging && o.x < size.width * 0.3f -> goPage(pager.currentPage - 1)
+                            tapPaging && o.x > size.width * 0.7f -> goPage(pager.currentPage + 1)
+                            o.x in size.width * 0.3f..size.width * 0.7f -> fullscreen = !fullscreen
+                        }
+                    })
                 },
             beyondViewportPageCount = 1,
         ) { page ->
@@ -427,7 +443,7 @@ internal fun StylePanel(
     Column(
         Modifier
             .fillMaxWidth()
-            .heightIn(max = 460.dp)
+            .heightIn(max = 520.dp)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
@@ -452,7 +468,17 @@ internal fun StylePanel(
             ChoiceChip("굵게", selected = style.bold, bold = true) { onChange(style.copy(bold = true)) }
         }
 
-        SliderRow("글자 크기", "${style.size.toInt()}", style.size, 13f..34f, 20) {
+        PanelLabel("절 번호 위치")
+        Row {
+            ChoiceChip("글 앞에 작게", selected = style.numInline) { onChange(style.copy(numInline = true)) }
+            Spacer(Modifier.width(8.dp))
+            ChoiceChip("왼쪽 칸", selected = !style.numInline) { onChange(style.copy(numInline = false)) }
+        }
+        SliderRow("번호 크기", "${(style.numScale * 100).roundToInt()}%", style.numScale, 0.4f..1.0f, 11) {
+            onChange(style.copy(numScale = it))
+        }
+
+        SliderRow("글자 크기", "${style.size.toInt()}", style.size, 13f..50f, 36) {
             onChange(style.copy(size = it))
         }
         SliderRow("줄 간격", String.format(Locale.US, "%.1f", style.lineSpacing), style.lineSpacing, 1.2f..2.4f, 11) {
@@ -558,25 +584,56 @@ private fun ChapterPage(book: BibleBook, chapter: Int, style: ReaderStyle, listS
 @Composable
 internal fun VerseRow(v: Verse, style: ReaderStyle) {
     val lh = (style.size * style.lineSpacing).sp
-    Row(Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp)) {
+    val numColor = MaterialTheme.colorScheme.primary
+    if (style.numInline) {
+        // 번호를 본문 첫머리 왼쪽 위에 작게 붙여서 글이 화면 좌우를 다 쓰게
+        val text = remember(v, style.size, style.numScale, numColor) {
+            buildAnnotatedString {
+                withStyle(
+                    SpanStyle(
+                        fontSize = (style.size * style.numScale).sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default,
+                        color = numColor,
+                        baselineShift = BaselineShift(0.45f),
+                    ),
+                ) { append("${v.number}") }
+                append("\u2009")
+                append(v.text)
+            }
+        }
         Text(
-            "${v.number}",
-            fontSize = (style.size * 0.72f).sp,
-            lineHeight = lh,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width((style.size * 1.7f).dp).padding(end = 8.dp, top = 2.dp),
-        )
-        Text(
-            v.text,
+            text,
             fontSize = style.size.sp,
             lineHeight = lh,
             fontFamily = style.fontFamily,
             fontWeight = style.weight,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp),
         )
+    } else {
+        Row(Modifier.fillMaxWidth().padding(vertical = (style.verseGap / 2f).dp)) {
+            Text(
+                "${v.number}",
+                fontSize = (style.size * style.numScale).sp,
+                lineHeight = lh,
+                fontWeight = FontWeight.Bold,
+                color = numColor,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .width((style.size * style.numScale * 2.2f).dp)
+                    .padding(end = 6.dp),
+            )
+            Text(
+                v.text,
+                fontSize = style.size.sp,
+                lineHeight = lh,
+                fontFamily = style.fontFamily,
+                fontWeight = style.weight,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -726,5 +783,21 @@ private fun MarkRow(
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "삭제") }
             }
         }
+    }
+}
+
+/** 전체화면: 상단 상태바·하단 버튼줄 숨기기 (가장자리에서 밀면 잠깐 보임) */
+@Composable
+private fun FullscreenEffect(on: Boolean) {
+    val activity = LocalContext.current as? Activity ?: return
+    DisposableEffect(on) {
+        val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        if (on) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 }

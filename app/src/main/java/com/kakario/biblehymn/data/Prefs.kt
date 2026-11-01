@@ -70,6 +70,16 @@ class Prefs(context: Context) {
         get() = sp.getInt("screenTimeout", 0)
         set(v) = sp.edit().putInt("screenTimeout", v).apply()
 
+    /** 절 번호를 본문 앞(왼쪽 위)에 작게 붙이기. false면 왼쪽 칸에 따로 */
+    var verseNumInline: Boolean
+        get() = sp.getBoolean("verseNumInline", true)
+        set(v) = sp.edit().putBoolean("verseNumInline", v).apply()
+
+    /** 절 번호 크기 (본문 글자 크기의 배수) */
+    var verseNumScale: Float
+        get() = sp.getFloat("verseNumScale", 0.6f)
+        set(v) = sp.edit().putFloat("verseNumScale", v).apply()
+
     /** 화면 왼쪽/오른쪽을 터치하면 이전/다음으로 넘기기 */
     var tapPaging: Boolean
         get() = sp.getBoolean("tapPaging", false)
