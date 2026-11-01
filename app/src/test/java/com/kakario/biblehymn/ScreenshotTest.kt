@@ -31,7 +31,7 @@ import org.junit.Test
 /** GitHub 빌드에서 화면을 이미지로 찍어 확인하기 위한 테스트 */
 class ScreenshotTest {
     @get:Rule
-    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5)
+    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 3200))
 
     private val sample = Verse(16, "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니 이는 저를 믿는 자마다 멸망치 않고 영생을 얻게 하려 하심이니라")
 
@@ -42,14 +42,12 @@ class ScreenshotTest {
                 Surface {
                     Column(Modifier.background(MaterialTheme.colorScheme.background).padding(12.dp)) {
                         ReaderFonts.forEachIndexed { i, (name, _) ->
-                            listOf(false, true).forEach { bold ->
-                                Text(
-                                    "$name · ${if (bold) "굵게" else "보통"}",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                            Text(name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            (0..2).forEach { lv ->
+                                VerseRow(
+                                    Verse(lv + 1, "태초에 하나님이 천지를 창조하시니라 (굵기 ${lv + 1}단계)"),
+                                    ReaderStyle.Default.copy(family = i, weightLevel = lv, size = 15f, verseGap = 0f, lineSpacing = 1.3f),
                                 )
-                                VerseRow(sample, ReaderStyle.Default.copy(family = i, bold = bold, size = 17f, verseGap = 2f))
                             }
                         }
                     }
@@ -66,6 +64,8 @@ class ScreenshotTest {
                     Column(Modifier.fillMaxWidth()) {
                         VerseRow(sample, ReaderStyle.Default)
                         StylePanel(ReaderStyle.Default, onChange = {}, onReset = {}, onClose = {})
+                        StylePanel(ReaderStyle.Default, onChange = {}, onReset = {}, onClose = {}, initialSection = "글꼴")
+                        StylePanel(ReaderStyle.Default, onChange = {}, onReset = {}, onClose = {}, initialSection = "전체화면 위치 표시")
                     }
                 }
             }

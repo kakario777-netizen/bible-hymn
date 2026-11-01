@@ -2,6 +2,9 @@ package com.kakario.biblehymn.ui
 
 import androidx.compose.foundation.background
 import android.app.Activity
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.FontVariation
 import android.widget.Toast
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.SpanStyle
@@ -203,28 +206,63 @@ fun BibleChaptersScreen(
     }
 }
 
-/** 성경 본문 글꼴 목록 (설정값 순서와 같음) */
+/** 굵기 3단계: 보통 / 굵게 / 더 굵게 */
+internal val WeightLevels = listOf(FontWeight.Normal, FontWeight.SemiBold, FontWeight.ExtraBold)
+internal val WeightLabels = listOf("보통", "굵게", "더 굵게")
+
+/** 가변 글꼴(굵기를 자유롭게 바꿀 수 있는 글꼴)을 3단계 굵기로 */
+@OptIn(ExperimentalTextApi::class)
+private fun variableFamily(res: Int): FontFamily = FontFamily(
+    WeightLevels.map { w -> Font(res, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight))) },
+)
+
+/**
+ * 성경 본문 글꼴 목록. 저장값은 이 순서의 번호라서 앞쪽 4개 순서는 바꾸지 않는다.
+ * 굵기 파일이 2개뿐인 글꼴(고운바탕)은 '굵게'와 '더 굵게'가 같다.
+ */
 internal val ReaderFonts: List<Pair<String, FontFamily>> = listOf(
     "기본" to FontFamily.Default,
     "나눔고딕" to FontFamily(
         Font(R.font.nanum_gothic, FontWeight.Normal),
-        Font(R.font.nanum_gothic_bold, FontWeight.Bold),
+        Font(R.font.nanum_gothic_bold, FontWeight.SemiBold),
+        Font(R.font.nanum_gothic_extrabold, FontWeight.ExtraBold),
     ),
     "나눔명조" to FontFamily(
         Font(R.font.nanum_myeongjo, FontWeight.Normal),
-        Font(R.font.nanum_myeongjo_bold, FontWeight.Bold),
+        Font(R.font.nanum_myeongjo_bold, FontWeight.SemiBold),
+        Font(R.font.nanum_myeongjo_extrabold, FontWeight.ExtraBold),
     ),
     "고운바탕" to FontFamily(
         Font(R.font.gowun_batang, FontWeight.Normal),
-        Font(R.font.gowun_batang_bold, FontWeight.Bold),
+        Font(R.font.gowun_batang_bold, FontWeight.SemiBold),
+        Font(R.font.gowun_batang_bold, FontWeight.ExtraBold),
     ),
+    "프리텐다드" to variableFamily(R.font.pretendard),
+    "본고딕" to variableFamily(R.font.noto_sans_kr),
+    "IBM 플렉스" to FontFamily(
+        Font(R.font.ibm_plex_regular, FontWeight.Normal),
+        Font(R.font.ibm_plex_semibold, FontWeight.SemiBold),
+        Font(R.font.ibm_plex_bold, FontWeight.ExtraBold),
+    ),
+    "고딕 A1" to FontFamily(
+        Font(R.font.gothic_a1_regular, FontWeight.Normal),
+        Font(R.font.gothic_a1_semibold, FontWeight.SemiBold),
+        Font(R.font.gothic_a1_extrabold, FontWeight.ExtraBold),
+    ),
+    "함렛" to variableFamily(R.font.hahmlet),
 )
+
+/** 글꼴 고르는 화면에 보여줄 순서 (읽기 편한 글꼴 먼저) */
+private val FontDisplayOrder = listOf(0, 4, 5, 6, 7, 1, 2, 3, 8)
+
+/** 위치 표시 자리 이름 */
+private val HeaderPosLabels = listOf("상단 왼쪽", "상단 가운데", "상단 오른쪽", "하단 왼쪽", "하단 가운데", "하단 오른쪽")
 
 /** 성경 본문 모양 */
 internal data class ReaderStyle(
     val size: Float,
     val family: Int,
-    val bold: Boolean,
+    val weightLevel: Int,
     val lineSpacing: Float,
     val verseGap: Float,
     val sideMargin: Float,
@@ -232,14 +270,15 @@ internal data class ReaderStyle(
     val numScale: Float,
     val header: Boolean,
     val headerSize: Float,
+    val headerPos: Int,
 ) {
     val fontFamily: FontFamily get() = ReaderFonts.getOrNull(family)?.second ?: FontFamily.Default
-    val weight: FontWeight get() = if (bold) FontWeight.Bold else FontWeight.Normal
+    val weight: FontWeight get() = WeightLevels.getOrElse(weightLevel) { FontWeight.Normal }
 
     fun save(prefs: Prefs) {
         prefs.fontSize = size
         prefs.fontFamily = family
-        prefs.fontBold = bold
+        prefs.fontWeightLevel = weightLevel
         prefs.lineSpacing = lineSpacing
         prefs.verseGap = verseGap
         prefs.sideMargin = sideMargin
@@ -247,14 +286,15 @@ internal data class ReaderStyle(
         prefs.verseNumScale = numScale
         prefs.fullscreenHeader = header
         prefs.fullscreenHeaderSize = headerSize
+        prefs.fullscreenHeaderPos = headerPos
     }
 
     companion object {
-        val Default = ReaderStyle(19f, 0, false, 1.65f, 10f, 18f, true, 0.6f, true, 11f)
+        val Default = ReaderStyle(19f, 0, 0, 1.65f, 10f, 18f, true, 0.6f, true, 11f, 1)
         fun load(prefs: Prefs) = ReaderStyle(
-            prefs.fontSize, prefs.fontFamily, prefs.fontBold, prefs.lineSpacing, prefs.verseGap, prefs.sideMargin,
+            prefs.fontSize, prefs.fontFamily, prefs.fontWeightLevel, prefs.lineSpacing, prefs.verseGap, prefs.sideMargin,
             prefs.verseNumInline, prefs.verseNumScale,
-            prefs.fullscreenHeader, prefs.fullscreenHeaderSize,
+            prefs.fullscreenHeader, prefs.fullscreenHeaderSize, prefs.fullscreenHeaderPos,
         )
     }
 }
@@ -332,19 +372,6 @@ private fun BibleReaderLoaded(
 
     Scaffold(
         topBar = {
-            if (fullscreen && style.header) {
-                Text(
-                    "${curBook.name} ${curChapter}장",
-                    fontSize = style.headerSize.sp,
-                    fontWeight = FontWeight.Light,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp, bottom = 2.dp),
-                )
-            }
             if (!fullscreen) BackTopBar(
                 title = "${curBook.name} ${curChapter}장",
                 onBack = onBack,
@@ -394,10 +421,17 @@ private fun BibleReaderLoaded(
             }
         },
     ) { pad ->
+        val showHeader = fullscreen && style.header
+        val headerTop = style.headerPos < 3
+        val headerSpace = (style.headerSize * 1.6f + 10f).dp
+        Box(Modifier.padding(pad).fillMaxSize()) {
         HorizontalPager(
             state = pager,
             modifier = Modifier
-                .padding(pad)
+                .padding(
+                    top = if (showHeader && headerTop) headerSpace else 0.dp,
+                    bottom = if (showHeader && !headerTop) headerSpace else 0.dp,
+                )
                 .fillMaxSize()
                 .pointerInput(tapPaging) {
                     detectTapGestures(onTap = { o ->
@@ -412,6 +446,27 @@ private fun BibleReaderLoaded(
         ) { page ->
             val (b, c) = locate(page)
             ChapterPage(b, c, style, listStateFor(page))
+        }
+        if (showHeader) {
+            val align = when (style.headerPos) {
+                0 -> Alignment.TopStart
+                2 -> Alignment.TopEnd
+                3 -> Alignment.BottomStart
+                4 -> Alignment.BottomCenter
+                5 -> Alignment.BottomEnd
+                else -> Alignment.TopCenter
+            }
+            Text(
+                "${curBook.name} ${curChapter}장",
+                fontSize = style.headerSize.sp,
+                fontWeight = FontWeight.Light,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                maxLines = 1,
+                modifier = Modifier
+                    .align(align)
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+            )
+        }
         }
     }
 
@@ -450,77 +505,161 @@ internal fun FontButton(selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** 아래에서 올라오는 글꼴 상세 설정 — 바꾸는 즉시 위 본문에 반영 */
+/**
+ * 아래에서 올라오는 글꼴 설정 — 분류를 먼저 고르고 한 단계 들어가서 조절.
+ * 바꾸는 즉시 위 본문에 반영된다.
+ */
 @Composable
 internal fun StylePanel(
     style: ReaderStyle,
     onChange: (ReaderStyle) -> Unit,
     onReset: () -> Unit,
     onClose: () -> Unit,
+    initialSection: String? = null,
 ) {
+    var section by remember { mutableStateOf(initialSection) }
     Column(
         Modifier
             .fillMaxWidth()
-            .heightIn(max = 520.dp)
+            .heightIn(max = 460.dp)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
-            TextButton(onClick = onReset) { Text("기본값") }
+            if (section == null) {
+                Text("글꼴 설정", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onReset) { Text("기본값") }
+            } else {
+                Text(
+                    "‹  $section",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { section = null }
+                        .padding(vertical = 8.dp),
+                )
+            }
             TextButton(onClick = onClose) { Text("완료", fontWeight = FontWeight.Bold) }
         }
 
-        PanelLabel("글꼴")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
-            ReaderFonts.forEachIndexed { i, (name, family) ->
-                ChoiceChip(name, selected = style.family == i, fontFamily = family) { onChange(style.copy(family = i)) }
-                Spacer(Modifier.width(8.dp))
+        when (section) {
+            null -> {
+                val fontName = ReaderFonts.getOrNull(style.family)?.first ?: "기본"
+                PanelCategory("글꼴", "$fontName · ${WeightLabels.getOrElse(style.weightLevel) { "" }}") { section = "글꼴" }
+                PanelCategory(
+                    "크기와 간격",
+                    "글자 ${style.size.toInt()} · 줄 ${String.format(Locale.US, "%.1f", style.lineSpacing)} · 절 ${style.verseGap.toInt()} · 여백 ${style.sideMargin.toInt()}",
+                ) { section = "크기와 간격" }
+                PanelCategory(
+                    "절 번호",
+                    "${if (style.numInline) "글 앞에 작게" else "왼쪽 칸"} · ${(style.numScale * 100).roundToInt()}%",
+                ) { section = "절 번호" }
+                PanelCategory(
+                    "전체화면 위치 표시",
+                    if (style.header) "켜짐 · ${HeaderPosLabels.getOrElse(style.headerPos) { "" }} · 크기 ${style.headerSize.toInt()}" else "꺼짐",
+                ) { section = "전체화면 위치 표시" }
             }
-        }
 
-        PanelLabel("굵기")
-        Row {
-            ChoiceChip("보통", selected = !style.bold) { onChange(style.copy(bold = false)) }
-            Spacer(Modifier.width(8.dp))
-            ChoiceChip("굵게", selected = style.bold, bold = true) { onChange(style.copy(bold = true)) }
-        }
+            "글꼴" -> {
+                PanelLabel("글꼴")
+                // 한 줄에 3개씩
+                FontDisplayOrder.chunked(3).forEach { rowIdx ->
+                    Row(Modifier.padding(bottom = 8.dp)) {
+                        rowIdx.forEach { i ->
+                            val (name, family) = ReaderFonts[i]
+                            ChoiceChip(name, selected = style.family == i, fontFamily = family) { onChange(style.copy(family = i)) }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                    }
+                }
+                PanelLabel("굵기")
+                Row {
+                    WeightLabels.forEachIndexed { i, label ->
+                        ChoiceChip(label, selected = style.weightLevel == i, fontFamily = style.fontFamily, weight = WeightLevels[i]) {
+                            onChange(style.copy(weightLevel = i))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
+                }
+            }
 
-        PanelLabel("절 번호 위치")
-        Row {
-            ChoiceChip("글 앞에 작게", selected = style.numInline) { onChange(style.copy(numInline = true)) }
-            Spacer(Modifier.width(8.dp))
-            ChoiceChip("왼쪽 칸", selected = !style.numInline) { onChange(style.copy(numInline = false)) }
-        }
-        SliderRow("번호 크기", "${(style.numScale * 100).roundToInt()}%", style.numScale, 0.4f..1.0f, 11) {
-            onChange(style.copy(numScale = it))
-        }
+            "크기와 간격" -> {
+                SliderRow("글자 크기", "${style.size.toInt()}", style.size, 13f..50f, 36) {
+                    onChange(style.copy(size = it))
+                }
+                SliderRow("줄 간격", String.format(Locale.US, "%.1f", style.lineSpacing), style.lineSpacing, 1.2f..2.4f, 11) {
+                    onChange(style.copy(lineSpacing = it))
+                }
+                SliderRow("절 간격", "${style.verseGap.toInt()}", style.verseGap, 0f..28f, 13) {
+                    onChange(style.copy(verseGap = it))
+                }
+                SliderRow("좌우 여백", "${style.sideMargin.toInt()}", style.sideMargin, 4f..48f, 10) {
+                    onChange(style.copy(sideMargin = it))
+                }
+            }
 
-        SliderRow("글자 크기", "${style.size.toInt()}", style.size, 13f..50f, 36) {
-            onChange(style.copy(size = it))
-        }
-        SliderRow("줄 간격", String.format(Locale.US, "%.1f", style.lineSpacing), style.lineSpacing, 1.2f..2.4f, 11) {
-            onChange(style.copy(lineSpacing = it))
-        }
-        SliderRow("절 간격", "${style.verseGap.toInt()}", style.verseGap, 0f..28f, 13) {
-            onChange(style.copy(verseGap = it))
-        }
-        SliderRow("좌우 여백", "${style.sideMargin.toInt()}", style.sideMargin, 4f..48f, 10) {
-            onChange(style.copy(sideMargin = it))
-        }
+            "절 번호" -> {
+                PanelLabel("위치")
+                Row {
+                    ChoiceChip("글 앞에 작게", selected = style.numInline) { onChange(style.copy(numInline = true)) }
+                    Spacer(Modifier.width(8.dp))
+                    ChoiceChip("왼쪽 칸", selected = !style.numInline) { onChange(style.copy(numInline = false)) }
+                }
+                SliderRow("번호 크기", "${(style.numScale * 100).roundToInt()}%", style.numScale, 0.4f..1.0f, 11) {
+                    onChange(style.copy(numScale = it))
+                }
+            }
 
-        PanelLabel("전체화면 위치 표시 (화면 가운데 누르면 전체화면)")
-        Row {
-            ChoiceChip("켜기", selected = style.header) { onChange(style.copy(header = true)) }
-            Spacer(Modifier.width(8.dp))
-            ChoiceChip("끄기", selected = !style.header) { onChange(style.copy(header = false)) }
-        }
-        if (style.header) {
-            SliderRow("표시 크기", "${style.headerSize.toInt()}", style.headerSize, 8f..18f, 9) {
-                onChange(style.copy(headerSize = it))
+            "전체화면 위치 표시" -> {
+                Text(
+                    "성경 화면 가운데를 누르면 전체화면이 되고, 지금 위치(예: 창세기 1장)를 작게 보여줘요",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                PanelLabel("표시")
+                Row {
+                    ChoiceChip("켜기", selected = style.header) { onChange(style.copy(header = true)) }
+                    Spacer(Modifier.width(8.dp))
+                    ChoiceChip("끄기", selected = !style.header) { onChange(style.copy(header = false)) }
+                }
+                if (style.header) {
+                    PanelLabel("자리")
+                    HeaderPosLabels.chunked(3).forEachIndexed { r, row ->
+                        Row(Modifier.padding(bottom = 8.dp)) {
+                            row.forEachIndexed { c, label ->
+                                val pos = r * 3 + c
+                                ChoiceChip(label, selected = style.headerPos == pos) { onChange(style.copy(headerPos = pos)) }
+                                Spacer(Modifier.width(8.dp))
+                            }
+                        }
+                    }
+                    SliderRow("표시 크기", "${style.headerSize.toInt()}", style.headerSize, 8f..18f, 9) {
+                        onChange(style.copy(headerSize = it))
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun PanelCategory(title: String, summary: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(summary, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 }
 
 @Composable
@@ -539,7 +678,7 @@ private fun ChoiceChip(
     label: String,
     selected: Boolean,
     fontFamily: FontFamily? = null,
-    bold: Boolean = false,
+    weight: FontWeight = FontWeight.Normal,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -552,8 +691,9 @@ private fun ChoiceChip(
             label,
             fontSize = 15.sp,
             fontFamily = fontFamily,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            fontWeight = weight,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
         )
     }
 }

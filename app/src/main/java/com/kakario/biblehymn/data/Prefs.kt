@@ -46,9 +46,10 @@ class Prefs(context: Context) {
         get() = sp.getInt("fontFamily", 0)
         set(v) = sp.edit().putInt("fontFamily", v).apply()
 
-    var fontBold: Boolean
-        get() = sp.getBoolean("fontBold", false)
-        set(v) = sp.edit().putBoolean("fontBold", v).apply()
+    /** 굵기: 0 = 보통, 1 = 굵게, 2 = 더 굵게 (예전 '굵게' 설정은 2로 이어받음) */
+    var fontWeightLevel: Int
+        get() = sp.getInt("fontWeightLevel", if (sp.getBoolean("fontBold", false)) 2 else 0)
+        set(v) = sp.edit().putInt("fontWeightLevel", v).apply()
 
     /** 줄 간격 (글자 크기의 배수) */
     var lineSpacing: Float
@@ -84,6 +85,11 @@ class Prefs(context: Context) {
     var fullscreenHeader: Boolean
         get() = sp.getBoolean("fullscreenHeader", true)
         set(v) = sp.edit().putBoolean("fullscreenHeader", v).apply()
+
+    /** 위치 표시 자리: 0~2 = 상단 왼쪽/가운데/오른쪽, 3~5 = 하단 왼쪽/가운데/오른쪽 */
+    var fullscreenHeaderPos: Int
+        get() = sp.getInt("fullscreenHeaderPos", 1)
+        set(v) = sp.edit().putInt("fullscreenHeaderPos", v).apply()
 
     var fullscreenHeaderSize: Float
         get() = sp.getFloat("fullscreenHeaderSize", 11f)

@@ -73,6 +73,7 @@ fun HomeScreen(
     val context = LocalContext.current
     var subtitle by remember { mutableStateOf(prefs.homeSubtitle) }
     var showSettings by remember { mutableStateOf(false) }
+    var section by remember { mutableStateOf<String?>(null) }
     var editSubtitle by remember { mutableStateOf(false) }
     var tapPaging by remember { mutableStateOf(prefs.tapPaging) }
     var screenTimeout by remember { mutableStateOf(prefs.screenTimeout) }
@@ -125,93 +126,98 @@ fun HomeScreen(
 
     if (showSettings) {
         AlertDialog(
-            onDismissRequest = { showSettings = false },
-            title = { Text("설정") },
+            onDismissRequest = { showSettings = false; section = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (section != null) {
+                        Text(
+                            "‹ ",
+                            fontSize = 24.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { section = null },
+                        )
+                    }
+                    Text(section ?: "설정")
+                }
+            },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("배경색", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    listOf(0 to "시스템 설정", 1 to "흰색", 2 to "검은색").forEach { (mode, label) ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { onThemeMode(mode) }
-                                .padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = themeMode == mode, onClick = { onThemeMode(mode) })
-                            Text(label, fontSize = 16.sp)
+                    when (section) {
+                        null -> {
+                            val themeLabel = listOf("시스템 설정", "흰색", "검은색").getOrElse(themeMode) { "" }
+                            val offLabel = listOf("시스템 설정", "30분", "2시간", "안 꺼짐").getOrElse(screenTimeout) { "" }
+                            SettingsCategory("화면 색", "배경색 · $themeLabel") { section = "화면 색" }
+                            SettingsCategory("읽기 화면", "자동 꺼짐 $offLabel · 좌우 터치 ${if (tapPaging) "켜짐" else "꺼짐"}") { section = "읽기 화면" }
+                            SettingsCategory("첫 화면", "부제목 · ${subtitle.ifBlank { "없음" }}") { section = "첫 화면" }
                         }
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                    Text("화면 자동 꺼짐", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    Text(
-                        "성경·악보를 보는 동안, 마지막으로 만진 뒤 이 시간까지 화면이 켜져 있어요",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    listOf(0 to "시스템 설정", 1 to "30분", 2 to "2시간", 3 to "안 꺼짐").forEach { (mode, label) ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    screenTimeout = mode
-                                    prefs.screenTimeout = mode
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = screenTimeout == mode, onClick = {
-                                screenTimeout = mode
-                                prefs.screenTimeout = mode
-                            })
-                            Text(label, fontSize = 16.sp)
+                        "화면 색" -> {
+                            Text("배경색", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            listOf(0 to "시스템 설정", 1 to "흰색", 2 to "검은색").forEach { (mode, label) ->
+                                RadioRow(label, themeMode == mode) { onThemeMode(mode) }
+                            }
                         }
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                tapPaging = !tapPaging
-                                prefs.tapPaging = tapPaging
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("좌우 터치로 넘기기", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        "읽기 화면" -> {
+                            Text("화면 자동 꺼짐", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                             Text(
-                                "성경·악보 화면 왼쪽/오른쪽을 누르면 이전/다음으로",
+                                "성경·악보를 보는 동안, 마지막으로 만진 뒤 이 시간까지 화면이 켜져 있어요",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            listOf(0 to "시스템 설정", 1 to "30분", 2 to "2시간", 3 to "안 꺼짐").forEach { (mode, label) ->
+                                RadioRow(label, screenTimeout == mode) {
+                                    screenTimeout = mode
+                                    prefs.screenTimeout = mode
+                                }
+                            }
+                            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        tapPaging = !tapPaging
+                                        prefs.tapPaging = tapPaging
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("좌우 터치로 넘기기", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        "성경·악보 화면 왼쪽/오른쪽을 누르면 이전/다음으로",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(
+                                    checked = tapPaging,
+                                    onCheckedChange = {
+                                        tapPaging = it
+                                        prefs.tapPaging = it
+                                    },
+                                )
+                            }
                         }
-                        Switch(
-                            checked = tapPaging,
-                            onCheckedChange = {
-                                tapPaging = it
-                                prefs.tapPaging = it
-                            },
-                        )
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                    Text("부제목", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { editSubtitle = true }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            subtitle.ifBlank { "제목 밑에 넣을 글 (비어 있음)" },
-                            fontSize = 15.sp,
-                            color = if (subtitle.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text("편집", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        "첫 화면" -> {
+                            Text("부제목", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { editSubtitle = true }
+                                    .padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    subtitle.ifBlank { "제목 밑에 넣을 글 (비어 있음)" },
+                                    fontSize = 15.sp,
+                                    color = if (subtitle.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text("편집", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showSettings = false }) { Text("닫기") } },
+            confirmButton = { TextButton(onClick = { showSettings = false; section = null }) { Text("닫기") } },
         )
     }
 
@@ -446,4 +452,35 @@ private fun DrawScope.sparkle(c: Offset, r: Float) {
         close()
     }
     drawPath(p, Color.White)
+}
+
+/** 설정 분류 한 줄 (누르면 한 단계 들어감) */
+@Composable
+private fun SettingsCategory(title: String, summary: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(summary, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(label, fontSize = 16.sp)
+    }
 }
