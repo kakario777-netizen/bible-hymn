@@ -1,0 +1,10 @@
+{
+ "number": 555,
+ "title": "세번 아멘",
+ "verses": [
+  "아멘 아멘 아멘"
+ ],
+ "refrain": "",
+ "amen": false,
+ "notes": "가사 전체가 아멘이므로 verse에 기록, amen false"
+}
