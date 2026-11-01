@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -114,12 +115,17 @@ private fun Loading(modifier: Modifier = Modifier) {
 @Composable
 fun BibleBooksScreen(
     onBack: () -> Unit,
+    onSearch: () -> Unit,
     onBook: (book: Int, chapterCount: Int) -> Unit,
 ) {
     val books = rememberBooks()
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
-    Scaffold(topBar = { BackTopBar("성경 (개역한글)", onBack) }) { pad ->
+    Scaffold(topBar = {
+        BackTopBar("성경 (개역한글)", onBack, actions = {
+            IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "검색") }
+        })
+    }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             TabRow(selectedTabIndex = tab) {
                 Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("구약 39권") })
@@ -174,11 +180,16 @@ fun BibleBooksScreen(
 fun BibleChaptersScreen(
     book: Int,
     onBack: () -> Unit,
+    onSearch: () -> Unit,
     onChapter: (Int) -> Unit,
 ) {
     val books = rememberBooks()
     val b = books?.firstOrNull { it.index == book }
-    Scaffold(topBar = { BackTopBar(b?.name ?: "", onBack) }) { pad ->
+    Scaffold(topBar = {
+        BackTopBar(b?.name ?: "", onBack, actions = {
+            IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "검색") }
+        })
+    }) { pad ->
         if (b == null) {
             Loading(Modifier.padding(pad))
         } else {

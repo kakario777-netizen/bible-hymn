@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -364,7 +366,7 @@ private fun HymnCard(modifier: Modifier, onClick: () -> Unit) {
                     color = on.copy(alpha = 0.75f),
                 )
             }
-            Text("♪", fontSize = 48.sp, color = on.copy(alpha = 0.35f))
+            NoteCluster(on)
         }
     }
 }
@@ -482,5 +484,36 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Text(label, fontSize = 16.sp)
+    }
+}
+
+/** 찬송가 카드 오른쪽 음표 묶음: 크기·기울기·진하기를 조금씩 달리해서 */
+@Composable
+private fun NoteCluster(color: Color) {
+    Box(Modifier.size(width = 92.dp, height = 84.dp)) {
+        Text(
+            "♫",
+            fontSize = 50.sp,
+            color = color.copy(alpha = 0.34f),
+            modifier = Modifier.align(Alignment.Center).offset(x = 6.dp, y = 4.dp),
+        )
+        Text(
+            "♪",
+            fontSize = 28.sp,
+            color = color.copy(alpha = 0.26f),
+            modifier = Modifier.align(Alignment.TopStart).offset(x = 2.dp, y = 0.dp).rotate(-14f),
+        )
+        Text(
+            "♬",
+            fontSize = 22.sp,
+            color = color.copy(alpha = 0.22f),
+            modifier = Modifier.align(Alignment.BottomEnd).offset(x = 0.dp, y = (-2).dp).rotate(10f),
+        )
+        Text(
+            "♩",
+            fontSize = 18.sp,
+            color = color.copy(alpha = 0.18f),
+            modifier = Modifier.align(Alignment.BottomStart).offset(x = 10.dp, y = (-6).dp).rotate(-6f),
+        )
     }
 }

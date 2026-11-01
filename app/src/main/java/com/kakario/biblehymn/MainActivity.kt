@@ -30,6 +30,7 @@ import com.kakario.biblehymn.ui.AppTheme
 import com.kakario.biblehymn.ui.BibleBooksScreen
 import com.kakario.biblehymn.ui.BibleChaptersScreen
 import com.kakario.biblehymn.ui.BibleReaderScreen
+import com.kakario.biblehymn.ui.BibleSearchScreen
 import com.kakario.biblehymn.ui.BookmarksScreen
 import com.kakario.biblehymn.ui.HomeScreen
 import com.kakario.biblehymn.ui.HymnListScreen
@@ -42,6 +43,7 @@ sealed interface Screen {
     data class BibleChapters(val book: Int) : Screen
     data class BibleReader(val book: Int, val chapter: Int, val verse: Int = 1) : Screen
     data object Bookmarks : Screen
+    data class BibleSearch(val book: Int?) : Screen
     data class HymnList(val book: SongBook) : Screen
     data class HymnViewer(val book: SongBook, val number: Int) : Screen
 }
@@ -123,6 +125,7 @@ private fun App(prefs: Prefs, themeMode: Int, onThemeMode: (Int) -> Unit) {
 
         Screen.BibleBooks -> BibleBooksScreen(
             onBack = ::pop,
+            onSearch = { push(Screen.BibleSearch(null)) },
             onBook = { book, chapterCount ->
                 if (chapterCount == 1) push(Screen.BibleReader(book, 1))
                 else push(Screen.BibleChapters(book))
@@ -132,6 +135,7 @@ private fun App(prefs: Prefs, themeMode: Int, onThemeMode: (Int) -> Unit) {
         is Screen.BibleChapters -> BibleChaptersScreen(
             book = screen.book,
             onBack = ::pop,
+            onSearch = { push(Screen.BibleSearch(screen.book)) },
             onChapter = { push(Screen.BibleReader(screen.book, it)) },
         )
 
@@ -144,6 +148,12 @@ private fun App(prefs: Prefs, themeMode: Int, onThemeMode: (Int) -> Unit) {
                 onBack = ::pop,
             )
         }
+
+        is Screen.BibleSearch -> BibleSearchScreen(
+            initialBook = screen.book,
+            onBack = ::pop,
+            onOpen = { b, c, v -> push(Screen.BibleReader(b, c, v)) },
+        )
 
         Screen.Bookmarks -> BookmarksScreen(
             prefs = prefs,

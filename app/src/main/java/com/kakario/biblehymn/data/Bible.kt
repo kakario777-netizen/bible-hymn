@@ -65,4 +65,32 @@ object Bible {
         }
         return result
     }
+
+    /**
+     * 단어 검색. bookFilter가 null이면 성경 전체.
+     * 띄어쓰기가 달라도 찾을 수 있게, 그대로 안 맞으면 공백을 빼고 한 번 더 비교한다.
+     */
+    fun search(context: Context, query: String, bookFilter: Set<Int>?, limit: Int = 3000): List<SearchHit> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val qNoSpace = q.replace(" ", "")
+        val out = ArrayList<SearchHit>()
+        for (b in books(context)) {
+            if (bookFilter != null && b.index !in bookFilter) continue
+            context.assets.open("bible/%02d.txt".format(b.index)).bufferedReader(Charsets.UTF_8).useLines { lines ->
+                for (line in lines) {
+                    val p = line.split('\t', limit = 3)
+                    if (p.size < 3) continue
+                    val text = p[2]
+                    if (text.contains(q) || text.replace(" ", "").contains(qNoSpace)) {
+                        out.add(SearchHit(b.index, p[0].toInt(), p[1].toInt(), text))
+                        if (out.size >= limit) return out
+                    }
+                }
+            }
+        }
+        return out
+    }
 }
+
+data class SearchHit(val book: Int, val chapter: Int, val verse: Int, val text: String)

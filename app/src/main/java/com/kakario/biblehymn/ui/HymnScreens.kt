@@ -104,17 +104,32 @@ fun HymnListScreen(
     val listState = rememberLazyListState()
 
     val q = query.trim()
-    val filtered = remember(hymns, q) {
+    // 가사 검색용: 곡 번호 → 가사 전체(절+후렴)
+    val context = LocalContext.current
+    val lyricIndex by produceState<Map<Int, String>>(emptyMap(), book, hymns) {
+        val all = hymns ?: return@produceState
+        value = withContext(Dispatchers.IO) {
+            all.mapNotNull { h ->
+                LyricsStore.get(context, book, h.number)?.let { l ->
+                    h.number to (l.verses + listOf(l.refrain)).filter { it.isNotBlank() }.joinToString("  /  ")
+                }
+            }.toMap()
+        }
+    }
+    val filtered: List<Pair<Hymn, String?>> = remember(hymns, q, lyricIndex) {
         val all = hymns ?: emptyList()
         when {
-            q.isEmpty() -> all
+            q.isEmpty() -> all.map { it to null }
             q.all { it.isDigit() } -> {
                 val n = q.toIntOrNull()
-                all.filter { it.number == n } + all.filter { it.number != n && it.number.toString().startsWith(q) }
+                (all.filter { it.number == n } + all.filter { it.number != n && it.number.toString().startsWith(q) }).map { it to null }
             }
             else -> {
                 val key = q.replace(" ", "")
-                all.filter { it.title.replace(" ", "").contains(key) }
+                val byTitle = all.filter { it.title.replace(" ", "").contains(key) }
+                val titleSet = byTitle.map { it.number }.toSet()
+                val byLyrics = all.filter { it.number !in titleSet && (lyricIndex[it.number]?.replace(" ", "")?.contains(key) == true) }
+                byTitle.map { it to null } + byLyrics.map { it to lyricSnippet(lyricIndex[it.number] ?: "", q) }
             }
         }
     }
@@ -140,7 +155,7 @@ fun HymnListScreen(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("장 번호 또는 제목으로 찾기") },
+                placeholder = { Text("장 번호, 제목, 가사로 찾기") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
@@ -149,7 +164,7 @@ fun HymnListScreen(
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = {
-                    filtered.firstOrNull()?.let { onHymn(it.number) }
+                    filtered.firstOrNull()?.let { onHymn(it.first.number) }
                 }),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
@@ -171,8 +186,8 @@ fun HymnListScreen(
                         modifier = Modifier.fillMaxSize().padding(end = if (showScroller) 40.dp else 0.dp),
                         contentPadding = PaddingValues(bottom = 24.dp),
                     ) {
-                        items(filtered, key = { it.number }) { h ->
-                            HymnRow(h, highlighted = h.number == prefs.lastSong(book)) { onHymn(h.number) }
+                        items(filtered, key = { it.first.number }) { (h, snippet) ->
+                            HymnRow(h, highlighted = h.number == prefs.lastSong(book), snippet = snippet, query = q) { onHymn(h.number) }
                             HorizontalDivider(
                                 Modifier.padding(start = 76.dp),
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
@@ -180,7 +195,7 @@ fun HymnListScreen(
                         }
                     }
                     if (showScroller) {
-                        FastScroller(listState, filtered, Modifier.align(Alignment.CenterEnd))
+                        FastScroller(listState, filtered.map { it.first }, Modifier.align(Alignment.CenterEnd))
                     }
                 }
             }
@@ -226,7 +241,7 @@ fun HymnListScreen(
 }
 
 @Composable
-private fun HymnRow(h: Hymn, highlighted: Boolean, onClick: () -> Unit) {
+private fun HymnRow(h: Hymn, highlighted: Boolean, snippet: String? = null, query: String = "", onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -243,14 +258,25 @@ private fun HymnRow(h: Hymn, highlighted: Boolean, onClick: () -> Unit) {
             textAlign = TextAlign.End,
             modifier = Modifier.width(44.dp),
         )
-        Text(
-            h.title,
-            fontSize = 17.sp,
-            color = if (h.hasScore) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(start = 16.dp),
-        )
+        Column(Modifier.weight(1f).padding(start = 16.dp)) {
+            Text(
+                h.title,
+                fontSize = 17.sp,
+                color = if (h.hasScore) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (snippet != null) {
+                Text(
+                    highlight(snippet, query, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         if (h.pages.size > 1) {
             Text(
                 "${h.pages.size}쪽",
@@ -260,6 +286,21 @@ private fun HymnRow(h: Hymn, highlighted: Boolean, onClick: () -> Unit) {
             )
         }
     }
+}
+
+/** 가사에서 찾은 곳 앞뒤를 잘라 보여주기 */
+private fun lyricSnippet(text: String, query: String): String {
+    val qc = query.replace(" ", "")
+    if (qc.isEmpty()) return text.take(40)
+    // 공백 무시하고 위치 찾기
+    val idx = ArrayList<Int>()
+    val sb = StringBuilder()
+    text.forEachIndexed { i, c -> if (c != ' ') { sb.append(c); idx.add(i) } }
+    val f = sb.indexOf(qc)
+    if (f < 0) return text.take(40)
+    val start = (idx[f] - 14).coerceAtLeast(0)
+    val end = (idx[f + qc.length - 1] + 26).coerceAtMost(text.length)
+    return (if (start > 0) "…" else "") + text.substring(start, end) + (if (end < text.length) "…" else "")
 }
 
 /** 악보 보기 — 좌우로 넘기면 앞/뒤 장 */
