@@ -151,7 +151,6 @@ fun HomeScreen(
                             SettingsCategory("화면 색", "배경색 · $themeLabel") { section = "화면 색" }
                             SettingsCategory("읽기 화면", "자동 꺼짐 $offLabel · 좌우 터치 ${if (tapPaging) "켜짐" else "꺼짐"}") { section = "읽기 화면" }
                             SettingsCategory("첫 화면", "부제목 · ${subtitle.ifBlank { "없음" }}") { section = "첫 화면" }
-                            SettingsCategory("성경 읽어주기", "폰 기본 음성 미리 듣기") { section = "성경 읽어주기" }
                         }
                         "화면 색" -> {
                             Text("배경색", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
@@ -198,9 +197,6 @@ fun HomeScreen(
                                     },
                                 )
                             }
-                        }
-                        "성경 읽어주기" -> {
-                            VoicePreviewSection()
                         }
                         "첫 화면" -> {
                             Text("부제목", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
