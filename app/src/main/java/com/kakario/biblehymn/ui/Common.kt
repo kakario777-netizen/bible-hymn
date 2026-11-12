@@ -37,6 +37,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.unit.sp
 
 /** 뒤로가기 화살표가 있는 상단바 */
@@ -141,7 +143,7 @@ internal fun androidx.compose.ui.Modifier.einkSwipe(
         val threshold = 48.dp.toPx()
         var dx = 0f
         var dy = 0f
-        androidx.compose.foundation.gestures.detectDragGestures(
+        detectDragGestures(
             onDragStart = { dx = 0f; dy = 0f },
             onDragEnd = {
                 val d = if (kotlin.math.abs(dx) >= kotlin.math.abs(dy)) dx else dy
@@ -157,7 +159,7 @@ internal fun androidx.compose.ui.Modifier.einkSwipe(
     else this.pointerInput(Unit) {
         val threshold = 48.dp.toPx()
         var total = 0f
-        androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+        detectHorizontalDragGestures(
             onDragStart = { total = 0f },
             onDragEnd = {
                 // 손가락을 왼쪽으로 밀면 다음, 오른쪽으로 밀면 이전
