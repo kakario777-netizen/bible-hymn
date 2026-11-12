@@ -151,6 +151,8 @@ fun HomeScreen(
                             SettingsCategory("화면 색", "배경색 · $themeLabel") { section = "화면 색" }
                             SettingsCategory("읽기 화면", "자동 꺼짐 $offLabel · 좌우 터치 ${if (tapPaging) "켜짐" else "꺼짐"}") { section = "읽기 화면" }
                             SettingsCategory("첫 화면", "부제목 · ${subtitle.ifBlank { "없음" }}") { section = "첫 화면" }
+                            // 이북판에만 '새 버전 확인' 줄이 나온다 (폰판은 빈 칸)
+                            com.kakario.biblehymn.flavor.UpdateSettingsRow()
                         }
                         "화면 색" -> {
                             Text("배경색", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
