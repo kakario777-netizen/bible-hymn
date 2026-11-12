@@ -44,6 +44,22 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    // 폰용 / 이북리더기용 두 가지 APK를 한 번에 만든다.
+    // 앱 ID가 달라서 서로 덮어쓰지 않고, 책갈피·설정도 따로 저장된다.
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+            buildConfigField("boolean", "IS_EINK", "false")
+        }
+        create("eink") {
+            dimension = "device"
+            applicationIdSuffix = ".eink"
+            buildConfigField("boolean", "IS_EINK", "true")
+        }
     }
 }
 

@@ -7,4 +7,9 @@
 
 - **내 영의 노래**: 417장 악보 (`app/src/main/assets/mysoul`)
 
-main 브랜치에 올리면 GitHub Actions가 APK를 만들어 Releases의 `latest`에 올린다.
+main 브랜치에 올리면 GitHub Actions가 APK 두 개를 만들어 Releases의 `latest`에 올린다.
+
+- `bible-hymn.apk` — 폰용 (`com.kakario.biblehymn`)
+- `bible-hymn-eink.apk` — 이북리더기(sam 10 Plus)용 (`com.kakario.biblehymn.eink`, 앱 이름 '성경찬송 이북')
+
+기능은 같고, 이북 전용 조절은 코드에서 `BuildConfig.IS_EINK`로 갈라서 이북판에만 적용한다.

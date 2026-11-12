@@ -33,16 +33,18 @@ jobs:
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk bible-hymn.apk
+        run: |
+          cp app/build/outputs/apk/phone/debug/app-phone-debug.apk bible-hymn.apk
+          cp app/build/outputs/apk/eink/debug/app-eink-debug.apk bible-hymn-eink.apk
 
       - name: Publish to Releases (latest)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest bible-hymn.apk \
+          gh release create latest bible-hymn.apk bible-hymn-eink.apk \
             --title "최신 빌드 #${{ github.run_number }}" \
-            --notes "커밋: ${{ github.sha }} — 폰에서 bible-hymn.apk를 눌러 받아 설치하세요." \
+            --notes "커밋: ${{ github.sha }} — 폰은 bible-hymn.apk, 이북리더기는 bible-hymn-eink.apk를 받아 설치하세요." \
             --target ${{ github.sha }}
 
       # 화면 캡처 테스트 — 실패해도 APK 배포에는 영향 없음
@@ -51,7 +53,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          gradle recordPaparazziDebug --no-daemon 2>&1 | tee shots.log
+          gradle recordPaparazziPhoneDebug --no-daemon 2>&1 | tee shots.log
 
       # 빌드 결과(성공/실패)를 build-log 브랜치에 남겨서 채팅에서도 확인할 수 있게 한다
       - name: Save build log
