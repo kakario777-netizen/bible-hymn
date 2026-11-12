@@ -131,8 +131,30 @@ internal suspend fun androidx.compose.foundation.pager.PagerState.goTo(page: Int
  * 이북판: 좌우로 밀면 슬라이드 없이 바로 이전/다음 페이지로.
  * (이북판은 페이저 자체 밀기를 꺼 두고 이걸로 대신한다. 폰판에서는 아무것도 안 함)
  */
-internal fun androidx.compose.ui.Modifier.einkSwipe(onSwipe: (dir: Int) -> Unit): androidx.compose.ui.Modifier =
-    if (!IsEink) this else this.pointerInput(Unit) {
+internal fun androidx.compose.ui.Modifier.einkSwipe(
+    vertical: Boolean = false,
+    onSwipe: (dir: Int) -> Unit,
+): androidx.compose.ui.Modifier =
+    if (!IsEink) this
+    else if (vertical) this.pointerInput(Unit) {
+        // 좌우·위아래 어느 쪽으로 밀어도: 왼쪽/위로 밀면 다음, 오른쪽/아래로 밀면 이전
+        val threshold = 48.dp.toPx()
+        var dx = 0f
+        var dy = 0f
+        androidx.compose.foundation.gestures.detectDragGestures(
+            onDragStart = { dx = 0f; dy = 0f },
+            onDragEnd = {
+                val d = if (kotlin.math.abs(dx) >= kotlin.math.abs(dy)) dx else dy
+                if (d <= -threshold) onSwipe(1) else if (d >= threshold) onSwipe(-1)
+            },
+            onDragCancel = { dx = 0f; dy = 0f },
+        ) { change, amount ->
+            change.consume()
+            dx += amount.x
+            dy += amount.y
+        }
+    }
+    else this.pointerInput(Unit) {
         val threshold = 48.dp.toPx()
         var total = 0f
         androidx.compose.foundation.gestures.detectHorizontalDragGestures(

@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -383,6 +384,49 @@ private fun BibleReaderLoaded(
         if (p in 0 until total) scope.launch { pager.goTo(p) }
     }
 
+    /**
+     * 좌우 터치·밀기로 넘기기.
+     * 폰판: 앞뒤 장으로. 이북판: 책처럼 한 화면씩 — 다음 화면은 잘린 절부터 시작,
+     * 장 끝에서 넘기면 다음 장 처음, 장 처음에서 되넘기면 앞 장의 마지막 화면.
+     */
+    fun turn(dir: Int) {
+        if (!IsEink) { goPage(pager.currentPage + dir); return }
+        val ls = listStateFor(pager.currentPage)
+        scope.launch {
+            val info = ls.layoutInfo
+            val vis = info.visibleItemsInfo
+            val viewport = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+            if (dir > 0) {
+                if (!ls.canScrollForward || vis.isEmpty()) {
+                    val p = pager.currentPage + 1
+                    if (p < total) {
+                        listStateFor(p).scrollToItem(0)
+                        pager.goTo(p)
+                    }
+                    return@launch
+                }
+                // 화면 아래에서 잘린 절(없으면 그다음 절)이 다음 화면 맨 위로
+                val last = vis.last()
+                val target = if (last.offset + last.size <= info.viewportEndOffset) last.index + 1 else last.index
+                if (target <= ls.firstVisibleItemIndex) ls.scrollBy(viewport) else ls.scrollToItem(target)
+            } else {
+                if (!ls.canScrollBackward) {
+                    val p = pager.currentPage - 1
+                    if (p >= 0) {
+                        pager.goTo(p)
+                        val prev = listStateFor(p)
+                        // 마지막 절로 보내면 목록 끝에 맞춰 마지막 화면이 보인다
+                        prev.scrollToItem((prev.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+                    }
+                    return@launch
+                }
+                ls.scrollBy(-viewport)
+                // 화면 맨 위 절이 잘려 있으면 그 절 처음부터 보이게
+                if (ls.firstVisibleItemScrollOffset > 0) ls.scrollToItem(ls.firstVisibleItemIndex)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             if (!fullscreen) BackTopBar(
@@ -446,12 +490,12 @@ private fun BibleReaderLoaded(
                     bottom = if (showHeader && !headerTop) headerSpace else 0.dp,
                 )
                 .fillMaxSize()
-                .einkSwipe { dir -> goPage(pager.currentPage + dir) }
+                .einkSwipe(vertical = true) { dir -> turn(dir) }
                 .pointerInput(tapPaging) {
                     detectTapGestures(onTap = { o ->
                         when {
-                            tapPaging && o.x < size.width * 0.3f -> goPage(pager.currentPage - 1)
-                            tapPaging && o.x > size.width * 0.7f -> goPage(pager.currentPage + 1)
+                            tapPaging && o.x < size.width * 0.3f -> turn(-1)
+                            tapPaging && o.x > size.width * 0.7f -> turn(1)
                             o.x in size.width * 0.3f..size.width * 0.7f -> fullscreen = !fullscreen
                         }
                     })
@@ -753,6 +797,8 @@ private fun ChapterPage(book: BibleBook, chapter: Int, style: ReaderStyle, listS
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
+        // 이북판: 위아래로 미끄러지는 스크롤 없이 화면 단위로만 넘김
+        userScrollEnabled = !IsEink,
         contentPadding = PaddingValues(start = style.sideMargin.dp, end = (style.sideMargin + 2f).dp, top = 12.dp, bottom = 40.dp),
     ) {
         item {
