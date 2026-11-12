@@ -166,6 +166,7 @@ fun ZoomableScore(
                             contentDescription = null,
                             contentScale = ContentScale.FillWidth,
                             filterQuality = FilterQuality.High,
+                            colorFilter = if (IsEink) EinkScoreFilter else null,
                             modifier = Modifier
                                 .width(boxWidth * shrink)
                                 .aspectRatio(b.width.toFloat() / b.height.toFloat()),
@@ -175,4 +176,29 @@ fun ZoomableScore(
             }
         }
     }
+}
+
+/**
+ * 이북판 악보: 파일은 그대로 두고 화면에 그릴 때만
+ * 흑백으로 바꾸고, 밝은 바탕(누런 종이색 등)은 완전 흰색으로 날린다.
+ * 밝기 200 이상 → 흰색, 25 이하 → 검은색, 그 사이는 늘려서 진하게.
+ */
+private val EinkScoreFilter: androidx.compose.ui.graphics.ColorFilter = run {
+    val lo = 25f
+    val hi = 200f
+    val k = 255f / (hi - lo)
+    val b = -k * lo
+    val r = 0.299f * k
+    val g = 0.587f * k
+    val bl = 0.114f * k
+    androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+        androidx.compose.ui.graphics.ColorMatrix(
+            floatArrayOf(
+                r, g, bl, 0f, b,
+                r, g, bl, 0f, b,
+                r, g, bl, 0f, b,
+                0f, 0f, 0f, 1f, 0f,
+            )
+        )
+    )
 }
