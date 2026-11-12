@@ -146,7 +146,8 @@ fun BibleBooksScreen(
                         Surface(
                             onClick = { onBook(b.index, b.chapterCount) },
                             shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = tileColor(),
+                            border = tileBorder(),
                             modifier = Modifier.fillMaxWidth().height(72.dp),
                         ) {
                             Column(
@@ -204,7 +205,8 @@ fun BibleChaptersScreen(
                     Surface(
                         onClick = { onChapter(c) },
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = tileColor(),
+                        border = tileBorder(),
                         modifier = Modifier.aspectRatio(1f),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -378,7 +380,7 @@ private fun BibleReaderLoaded(
     fun currentVerse(): Int = (listStates[pager.currentPage]?.firstVisibleItemIndex ?: 0).coerceAtLeast(1)
 
     fun goPage(p: Int) {
-        if (p in 0 until total) scope.launch { pager.animateScrollToPage(p) }
+        if (p in 0 until total) scope.launch { pager.goTo(p) }
     }
 
     Scaffold(
@@ -444,6 +446,7 @@ private fun BibleReaderLoaded(
                     bottom = if (showHeader && !headerTop) headerSpace else 0.dp,
                 )
                 .fillMaxSize()
+                .einkSwipe { dir -> goPage(pager.currentPage + dir) }
                 .pointerInput(tapPaging) {
                     detectTapGestures(onTap = { o ->
                         when {
@@ -454,6 +457,7 @@ private fun BibleReaderLoaded(
                     })
                 },
             beyondViewportPageCount = 1,
+            userScrollEnabled = !IsEink,
         ) { page ->
             val (b, c) = locate(page)
             ChapterPage(b, c, style, listStateFor(page))

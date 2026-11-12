@@ -97,7 +97,7 @@ class Prefs(context: Context) {
 
     /** 화면 왼쪽/오른쪽을 터치하면 이전/다음으로 넘기기 */
     var tapPaging: Boolean
-        get() = sp.getBoolean("tapPaging", false)
+        get() = sp.getBoolean("tapPaging", com.kakario.biblehymn.BuildConfig.IS_EINK) // 이북판은 기본 켜짐
         set(v) = sp.edit().putBoolean("tapPaging", v).apply()
 
     var lastHymn: Int

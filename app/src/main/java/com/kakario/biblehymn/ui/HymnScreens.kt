@@ -335,7 +335,7 @@ fun HymnViewerScreen(
             region == 0 -> fullscreen = !fullscreen
             tapPaging -> {
                 val target = pager.currentPage + region
-                if (target in 0 until pager.pageCount) scope.launch { pager.animateScrollToPage(target) }
+                if (target in 0 until pager.pageCount) scope.launch { pager.goTo(target) }
             }
         }
     }
@@ -381,7 +381,7 @@ fun HymnViewerScreen(
                 ) {
                     TextButton(
                         enabled = pager.currentPage > 0,
-                        onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } },
+                        onClick = { scope.launch { pager.goTo(pager.currentPage - 1) } },
                     ) { Text("◀ 이전") }
 
                     Text(
@@ -392,7 +392,7 @@ fun HymnViewerScreen(
 
                     TextButton(
                         enabled = pager.currentPage < pager.pageCount - 1,
-                        onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } },
+                        onClick = { scope.launch { pager.goTo(pager.currentPage + 1) } },
                     ) { Text("다음 ▶") }
                 }
             }
@@ -412,8 +412,13 @@ fun HymnViewerScreen(
                             top = if (showHeader && headerTop) headerSpace else 0.dp,
                             bottom = if (showHeader && !headerTop) headerSpace else 0.dp,
                         )
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .einkSwipe { dir ->
+                            val target = pager.currentPage + dir
+                            if (target in 0 until pager.pageCount) scope.launch { pager.goTo(target) }
+                        },
                     beyondViewportPageCount = 1,
+                    userScrollEnabled = !IsEink,
                     key = { hymns[it].number },
                 ) { page ->
                     val h = hymns[page]

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
 
 /** 뒤로가기 화살표가 있는 상단바 */
@@ -115,3 +116,45 @@ fun TextInputDialog(
         confirmButton = { TextButton(onClick = { onSave(value.text.trim()) }) { Text("저장") } },
     )
 }
+
+// ───────────────────────── 이북판: 슬라이드 없이 즉시 넘김 ─────────────────────────
+
+/** 이북리더기용 빌드인지 */
+internal val IsEink: Boolean = com.kakario.biblehymn.BuildConfig.IS_EINK
+
+/** 페이지 이동: 폰판은 미끄러지듯, 이북판은 바로 바뀜 (이잉크 잔상·깜빡임 방지) */
+internal suspend fun androidx.compose.foundation.pager.PagerState.goTo(page: Int) {
+    if (IsEink) scrollToPage(page) else animateScrollToPage(page)
+}
+
+/**
+ * 이북판: 좌우로 밀면 슬라이드 없이 바로 이전/다음 페이지로.
+ * (이북판은 페이저 자체 밀기를 꺼 두고 이걸로 대신한다. 폰판에서는 아무것도 안 함)
+ */
+internal fun androidx.compose.ui.Modifier.einkSwipe(onSwipe: (dir: Int) -> Unit): androidx.compose.ui.Modifier =
+    if (!IsEink) this else this.pointerInput(Unit) {
+        val threshold = 48.dp.toPx()
+        var total = 0f
+        androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = {
+                // 손가락을 왼쪽으로 밀면 다음, 오른쪽으로 밀면 이전
+                if (total <= -threshold) onSwipe(1) else if (total >= threshold) onSwipe(-1)
+                total = 0f
+            },
+            onDragCancel = { total = 0f },
+        ) { change, dx ->
+            change.consume()
+            total += dx
+        }
+    }
+
+/** 성경 권·장 번호 칸: 폰판은 옅은 바탕, 이북판은 바탕 없이 테두리만 */
+@androidx.compose.runtime.Composable
+internal fun tileColor(): androidx.compose.ui.graphics.Color =
+    if (IsEink) androidx.compose.material3.MaterialTheme.colorScheme.background
+    else androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+
+@androidx.compose.runtime.Composable
+internal fun tileBorder(): androidx.compose.foundation.BorderStroke? =
+    if (IsEink) androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.onBackground) else null
