@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 이북판: 앱 켤 때 바탕도 완전 흰색 -->
+    <color name="background">#FFFFFFFF</color>
+</resources>

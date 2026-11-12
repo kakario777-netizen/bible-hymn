@@ -261,6 +261,18 @@ private fun StrongChip(icon: Int, label: String, onClick: () -> Unit) {
 
 // ───────────────────────── 성경 카드 ─────────────────────────
 
+private val Eink = com.kakario.biblehymn.BuildConfig.IS_EINK
+
+/** 이북판 카드: 바탕색 없이 글자색 테두리만. */
+@Composable
+private fun einkBorder(): androidx.compose.foundation.BorderStroke? =
+    if (Eink) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.onBackground) else null
+
+@Composable
+private fun cardColors(container: Color, content: Color) =
+    if (Eink) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground)
+    else CardDefaults.cardColors(containerColor = container, contentColor = content)
+
 /** 성경: 아주 옅은 가죽 질감 + 가장자리 스티치 */
 @Composable
 private fun BibleCard(
@@ -269,17 +281,18 @@ private fun BibleCard(
     onContinue: () -> Unit,
     onBookmarks: () -> Unit,
 ) {
-    val on = MaterialTheme.colorScheme.onPrimaryContainer
+    val on = if (Eink) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onPrimaryContainer
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = on),
+        colors = cardColors(MaterialTheme.colorScheme.primaryContainer, on),
+        border = einkBorder(),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .leatherGrain(on)
+                .then(if (Eink) Modifier else Modifier.leatherGrain(on))
                 .drawBehind { stitchBorder(on.copy(alpha = 0.28f), inset = 7.dp.toPx(), radius = 16.dp.toPx()) },
         ) {
             Column(
@@ -346,12 +359,13 @@ private fun DrawScope.stitchBorder(color: Color, inset: Float, radius: Float) {
 /** 찬송가: 제목 왼쪽, 음표 오른쪽 */
 @Composable
 private fun HymnCard(modifier: Modifier, onClick: () -> Unit) {
-    val on = MaterialTheme.colorScheme.onSecondaryContainer
+    val on = if (Eink) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSecondaryContainer
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = on),
+        colors = cardColors(MaterialTheme.colorScheme.secondaryContainer, on),
+        border = einkBorder(),
     ) {
         Row(
             Modifier
@@ -380,11 +394,14 @@ private val MySoulBlue = Color(0xFF0B3394)
 /** 내 영의 노래 카드: 파란 바탕, 제목 위 물결 마크, 오른쪽 피아노줄 그림 */
 @Composable
 private fun MySoulCard(modifier: Modifier, onClick: () -> Unit) {
+    // 이북판: 파란 바탕 없이 글자색으로 (물결·피아노줄 그림도 글자색)
+    val ink = if (Eink) MaterialTheme.colorScheme.onBackground else Color.White
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MySoulBlue, contentColor = Color.White),
+        colors = cardColors(MySoulBlue, Color.White),
+        border = einkBorder(),
     ) {
         Row(
             Modifier
@@ -393,24 +410,24 @@ private fun MySoulCard(modifier: Modifier, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Swoosh(Modifier.width(150.dp).height(12.dp))
+                Swoosh(Modifier.width(150.dp).height(12.dp), ink)
                 Text("내 영의 노래", fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
                 Text(
                     "417장 · 악보",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp),
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = ink.copy(alpha = 0.75f),
                 )
             }
             Spacer(Modifier.width(8.dp))
-            PianoStrings(Modifier.width(38.dp).height(96.dp))
+            PianoStrings(Modifier.width(38.dp).height(96.dp), ink)
         }
     }
 }
 
 /** 제목 위 흰 물결(초승달 모양) 마크 */
 @Composable
-private fun Swoosh(modifier: Modifier) {
+private fun Swoosh(modifier: Modifier, color: Color) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -422,27 +439,27 @@ private fun Swoosh(modifier: Modifier) {
             cubicTo(w * 0.60f, h * 0.45f, w * 0.30f, h * 0.45f, 0f, h * 0.95f)
             close()
         }
-        drawPath(p, Color.White)
+        drawPath(p, color)
     }
 }
 
 /** 피아노줄(세로 가는 줄)과 작은 별 반짝임 */
 @Composable
-private fun PianoStrings(modifier: Modifier) {
+private fun PianoStrings(modifier: Modifier, color: Color) {
     Canvas(modifier) {
         val lines = 12
         val gap = size.width / (lines - 1)
         val stroke = 0.8.dp.toPx()
         for (i in 0 until lines) {
             val x = i * gap
-            drawLine(Color.White.copy(alpha = 0.85f), Offset(x, 0f), Offset(x, size.height), strokeWidth = stroke)
+            drawLine(color.copy(alpha = 0.85f), Offset(x, 0f), Offset(x, size.height), strokeWidth = stroke)
         }
         val stars = listOf(8 to 0.45f, 2 to 0.58f, 2 to 0.72f, 5 to 0.80f, 8 to 0.86f, 7 to 0.92f, 4 to 0.97f)
-        stars.forEach { (line, y) -> sparkle(Offset(line * gap, size.height * y), 3.4.dp.toPx()) }
+        stars.forEach { (line, y) -> sparkle(Offset(line * gap, size.height * y), 3.4.dp.toPx(), color) }
     }
 }
 
-private fun DrawScope.sparkle(c: Offset, r: Float) {
+private fun DrawScope.sparkle(c: Offset, r: Float, color: Color) {
     val k = r * 0.28f
     val p = Path().apply {
         moveTo(c.x, c.y - r)
@@ -455,7 +472,7 @@ private fun DrawScope.sparkle(c: Offset, r: Float) {
         lineTo(c.x - k, c.y - k)
         close()
     }
-    drawPath(p, Color.White)
+    drawPath(p, color)
 }
 
 /** 설정 분류 한 줄 (누르면 한 단계 들어감) */
