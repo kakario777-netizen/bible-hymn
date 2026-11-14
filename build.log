@@ -1,0 +1,99 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preEinkDebugBuild UP-TO-DATE
+> Task :app:mergeEinkDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateEinkDebugBuildConfig
+> Task :app:generateEinkDebugResValues
+> Task :app:checkEinkDebugAarMetadata
+> Task :app:mapEinkDebugSourceSetPaths
+> Task :app:generateEinkDebugResources
+> Task :app:packageEinkDebugResources
+> Task :app:mergeEinkDebugResources
+> Task :app:createEinkDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksEinkDebug
+> Task :app:parseEinkDebugLocalResources
+> Task :app:processEinkDebugMainManifest
+> Task :app:processEinkDebugManifest
+> Task :app:javaPreCompileEinkDebug
+> Task :app:mergeEinkDebugShaders
+> Task :app:compileEinkDebugShaders NO-SOURCE
+> Task :app:generateEinkDebugAssets UP-TO-DATE
+> Task :app:mergeEinkDebugAssets
+> Task :app:processEinkDebugManifestForPackage
+> Task :app:desugarEinkDebugFileDependencies
+> Task :app:checkEinkDebugDuplicateClasses
+> Task :app:compressEinkDebugAssets
+> Task :app:mergeEinkDebugJniLibFolders
+> Task :app:processEinkDebugResources
+> Task :app:mergeLibDexEinkDebug
+> Task :app:mergeEinkDebugNativeLibs
+> Task :app:validateSigningEinkDebug
+> Task :app:writeEinkDebugAppMetadata
+
+> Task :app:stripEinkDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :app:writeEinkDebugSigningConfigVersions
+> Task :app:prePhoneDebugBuild UP-TO-DATE
+> Task :app:mergePhoneDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generatePhoneDebugBuildConfig
+> Task :app:checkPhoneDebugAarMetadata
+> Task :app:generatePhoneDebugResValues
+> Task :app:mapPhoneDebugSourceSetPaths
+> Task :app:generatePhoneDebugResources
+> Task :app:packagePhoneDebugResources
+> Task :app:parsePhoneDebugLocalResources
+> Task :app:createPhoneDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksPhoneDebug
+> Task :app:mergePhoneDebugResources
+> Task :app:processPhoneDebugMainManifest
+> Task :app:processPhoneDebugManifest
+> Task :app:javaPreCompilePhoneDebug
+> Task :app:processPhoneDebugManifestForPackage
+> Task :app:mergePhoneDebugShaders
+> Task :app:compilePhoneDebugShaders NO-SOURCE
+> Task :app:generatePhoneDebugAssets UP-TO-DATE
+> Task :app:processPhoneDebugResources
+> Task :app:mergePhoneDebugAssets
+> Task :app:mergeExtDexEinkDebug
+> Task :app:checkPhoneDebugDuplicateClasses
+> Task :app:desugarPhoneDebugFileDependencies
+> Task :app:compressPhoneDebugAssets
+> Task :app:mergeExtDexPhoneDebug
+> Task :app:mergeLibDexPhoneDebug
+> Task :app:mergePhoneDebugJniLibFolders
+> Task :app:validateSigningPhoneDebug
+> Task :app:mergePhoneDebugNativeLibs
+> Task :app:writePhoneDebugAppMetadata
+
+> Task :app:stripPhoneDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :app:writePhoneDebugSigningConfigVersions
+> Task :app:compileEinkDebugKotlin
+> Task :app:compilePhoneDebugKotlin
+> Task :app:compilePhoneDebugJavaWithJavac
+> Task :app:compileEinkDebugJavaWithJavac
+> Task :app:dexBuilderEinkDebug
+> Task :app:mergeEinkDebugGlobalSynthetics
+> Task :app:processEinkDebugJavaRes
+> Task :app:mergeProjectDexEinkDebug
+> Task :app:mergeEinkDebugJavaResource
+> Task :app:dexBuilderPhoneDebug
+> Task :app:mergePhoneDebugGlobalSynthetics
+> Task :app:processPhoneDebugJavaRes
+> Task :app:mergeProjectDexPhoneDebug
+> Task :app:mergePhoneDebugJavaResource
+> Task :app:packageEinkDebug
+> Task :app:createEinkDebugApkListingFileRedirect
+> Task :app:assembleEinkDebug
+> Task :app:packagePhoneDebug
+> Task :app:createPhoneDebugApkListingFileRedirect
+> Task :app:assemblePhoneDebug
+> Task :app:assembleDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794659688487.json
+
+BUILD SUCCESSFUL in 1m 8s
+74 actionable tasks: 74 executed
