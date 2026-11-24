@@ -198,8 +198,7 @@ class Updater private constructor(private val context: Context) {
     }
 
     companion object {
-        // 공개 릴리스 저장소의 최신 릴리스 (코드 저장소는 비공개)
-        private const val API = "https://api.github.com/repos/kakario777-netizen/bible-hymn-release/releases/latest"
+        private const val API = "https://api.github.com/repos/kakario777-netizen/bible-hymn/releases/tags/latest"
 
         @Volatile private var instance: Updater? = null
         fun get(context: Context): Updater =
