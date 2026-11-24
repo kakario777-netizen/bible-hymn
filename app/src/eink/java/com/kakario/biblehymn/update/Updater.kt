@@ -168,7 +168,7 @@ class Updater private constructor(private val context: Context) {
     private fun fetchLatest(): Release? {
         val conn = open(API)
         val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-        // 릴리스 이름 '최신 빌드 #25' 의 25 = 빌드 번호 = 앱 versionCode
+        // 릴리스 이름 '성경찬송 v0.1.25 (빌드 #25)' 의 25 = 빌드 번호 = 앱 versionCode
         val build = Regex("#(\\d+)").find(json.optString("name"))?.groupValues?.get(1)?.toIntOrNull() ?: return null
         val assets = json.optJSONArray("assets") ?: return null
         for (i in 0 until assets.length()) {
@@ -198,7 +198,8 @@ class Updater private constructor(private val context: Context) {
     }
 
     companion object {
-        private const val API = "https://api.github.com/repos/kakario777-netizen/bible-hymn/releases/tags/latest"
+        // 공개 릴리스 저장소의 최신 릴리스 (코드 저장소는 비공개)
+        private const val API = "https://api.github.com/repos/kakario777-netizen/bible-hymn-release/releases/latest"
 
         @Volatile private var instance: Updater? = null
         fun get(context: Context): Updater =
