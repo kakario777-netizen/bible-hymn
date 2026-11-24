@@ -10,3 +10,7 @@
 .cxx/
 *.apk
 !app/debug.keystore
+
+# 서명 키는 GitHub Secrets에서 꺼내 씀
+*.keystore
+*.jks
